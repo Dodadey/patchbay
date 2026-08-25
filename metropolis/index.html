@@ -1,0 +1,1856 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, user-scalable=no">
+<title>Metropolis — Live Cue</title>
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Metropolis">
+<meta name="theme-color" content="#07080a">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 40 40'%3E%3Crect width='40' height='40' rx='8' fill='%2307080a'/%3E%3Cpath d='M8 31V13l6 7 6-7v18' fill='none' stroke='%23e0a83a' stroke-width='2.6' stroke-linejoin='round' stroke-linecap='round'/%3E%3Ccircle cx='29' cy='17' r='5.5' fill='none' stroke='%23e0a83a' stroke-width='2.2'/%3E%3Cpath d='M29 13.5V17l2.4 1.6' stroke='%23e0a83a' stroke-width='2.2' stroke-linecap='round' fill='none'/%3E%3C/svg%3E">
+<style>
+:root{
+  --bg:#07080a; --bg2:#0c0e12;
+  --panel:#111419; --panel2:#161a21; --raised:#1c212a;
+  --line:#242a34; --line2:#333b47;
+  --ink:#f4efe4; --dim:#8d94a1; --faint:#5b626e;
+  --gold:#e0a83a; --gold-dim:#8a6a24;
+  --amber:#f0a824; --red:#e8462a; --green:#49c07d; --blue:#4fa3e0; --violet:#9b7fe0;
+  --shadow:rgba(0,0,0,.6);
+  --safe-t:env(safe-area-inset-top,0px);
+  --safe-b:env(safe-area-inset-bottom,0px);
+  --safe-l:env(safe-area-inset-left,0px);
+  --safe-r:env(safe-area-inset-right,0px);
+  --mono:ui-monospace,"SF Mono",SFMono-Regular,Menlo,Consolas,"Roboto Mono",monospace;
+  --sans:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+}
+*{box-sizing:border-box; -webkit-tap-highlight-color:transparent;}
+html,body{height:100%;}
+body{
+  margin:0; background:var(--bg); color:var(--ink);
+  font-family:var(--sans);
+  overflow:hidden;
+  overscroll-behavior:none;
+  -webkit-user-select:none; user-select:none;
+  -webkit-text-size-adjust:100%;
+}
+input,textarea,select{-webkit-user-select:text; user-select:text;}
+button{font-family:inherit; color:inherit; cursor:pointer;}
+
+/* ---------- shell ---------- */
+#app{
+  position:fixed; inset:0;
+  padding:var(--safe-t) var(--safe-r) var(--safe-b) var(--safe-l);
+  display:grid;
+  grid-template-rows:auto minmax(0,1fr) auto auto;
+  grid-template-columns:minmax(0,1fr);
+  gap:0;
+}
+#app > *{min-width:0;}
+
+/* ---------- topbar ---------- */
+#topbar{
+  display:flex; align-items:center; gap:10px;
+  padding:8px 12px; background:var(--bg2);
+  border-bottom:1px solid var(--line);
+  min-height:44px; overflow:hidden;
+}
+.brand{
+  font-family:var(--mono); font-size:12px; font-weight:600;
+  letter-spacing:.22em; color:var(--gold); white-space:nowrap;
+}
+.brand span{color:var(--faint); letter-spacing:.14em;}
+.statuses{
+  display:flex; gap:6px; flex:1 1 0; min-width:0; flex-wrap:nowrap;
+  overflow-x:auto; overflow-y:hidden; scrollbar-width:none;
+}
+.statuses::-webkit-scrollbar{display:none;}
+.topbtns{flex:0 0 auto;}
+@media (max-width:900px){ .brand span{display:none;} }
+@media (max-width:640px){ .brand{font-size:10px; letter-spacing:.14em;} }
+.chip{
+  font-family:var(--mono); font-size:10.5px; letter-spacing:.08em;
+  padding:4px 8px; border-radius:5px; border:1px solid var(--line2);
+  color:var(--dim); background:var(--panel); white-space:nowrap;
+}
+.chip.on{color:var(--green); border-color:#26543c; background:#0e1b14;}
+.chip.warn{color:var(--amber); border-color:#5a4415; background:#1a1408;}
+.chip.bad{color:var(--red); border-color:#5c2419; background:#1c0d09;}
+.chip.live{color:var(--gold); border-color:var(--gold-dim); background:#191307;}
+.topbtns{display:flex; gap:6px;}
+.tbtn{
+  background:var(--panel); border:1px solid var(--line2); border-radius:7px;
+  padding:7px 11px; font-family:var(--mono); font-size:11px; letter-spacing:.1em;
+  color:var(--dim);
+}
+.tbtn:active{background:var(--raised);}
+.tbtn.active{color:var(--gold); border-color:var(--gold-dim);}
+
+/* ---------- stage ---------- */
+#stage{
+  display:grid; grid-template-columns:minmax(0,1.05fr) minmax(0,1fr);
+  gap:10px; padding:10px; min-height:0;
+}
+@media (orientation:portrait), (max-aspect-ratio:9/10){
+  #stage{grid-template-columns:minmax(0,1fr); grid-template-rows:auto minmax(0,1fr);}
+}
+.col{display:flex; flex-direction:column; gap:10px; min-height:0; min-width:0;}
+.card{
+  background:var(--panel); border:1px solid var(--line); border-radius:12px;
+  padding:12px 14px; min-width:0;
+}
+.label{
+  font-family:var(--mono); font-size:10px; letter-spacing:.26em;
+  color:var(--faint); margin-bottom:6px;
+}
+
+/* clock */
+#clockCard{text-align:left; padding-bottom:10px;}
+#clock{
+  font-family:var(--mono); font-weight:600; font-variant-numeric:tabular-nums;
+  font-size:clamp(46px,10.4vw,116px); line-height:.94; letter-spacing:-.02em;
+  color:var(--ink);
+}
+#clock small{font-size:.42em; color:var(--gold); font-weight:500; letter-spacing:0;}
+#clockSub{
+  display:flex; gap:14px; flex-wrap:wrap; margin-top:8px;
+  font-family:var(--mono); font-size:12px; color:var(--dim); font-variant-numeric:tabular-nums;
+}
+#clockSub b{color:var(--ink); font-weight:600;}
+body.stopped #clock{color:var(--faint);}
+
+/* now */
+#nowCard{flex:0 0 auto; display:flex; flex-direction:column; min-height:0;}
+#nowTitle{
+  font-size:clamp(20px,3.2vw,34px); font-weight:600; line-height:1.1;
+  color:var(--ink); word-break:break-word;
+}
+#nowNote{
+  margin-top:6px; font-size:clamp(13px,1.7vw,18px); line-height:1.35; color:var(--dim);
+}
+#nowMeta{
+  display:flex; gap:10px; align-items:baseline; margin-top:8px; flex-wrap:wrap;
+  font-family:var(--mono); font-size:13px; color:var(--faint); font-variant-numeric:tabular-nums;
+}
+#nowMeta .bt{
+  color:var(--gold); font-size:17px; font-weight:600;
+  border:1px solid var(--gold-dim); border-radius:6px; padding:2px 9px; background:#160f04;
+}
+
+/* slot: docked film window, or the running order when there is no film */
+#slotCard{flex:1 1 auto; display:flex; flex-direction:column; min-height:0; overflow:hidden;}
+#filmSlot{flex:1 1 auto; min-height:0; display:none; align-items:stretch; justify-content:center;}
+#slotCard.film #filmSlot{display:flex;}
+#slotCard.film #order{display:none;}
+#order{
+  list-style:none; margin:0; padding:0; flex:1 1 auto; min-height:0; overflow:auto;
+  display:flex; flex-direction:column; gap:5px;
+}
+#order li{
+  display:flex; align-items:baseline; gap:10px; padding:7px 10px; border-radius:8px;
+  background:var(--panel2); border:1px solid var(--line); min-width:0;
+}
+#order li.past{opacity:.4;}
+#order li.now{border-color:var(--green); background:#0d1a12;}
+#order li.next{border-color:var(--gold-dim); background:#181205;}
+#order .ot{font-family:var(--mono); font-size:12px; color:var(--gold); font-variant-numeric:tabular-nums; flex:0 0 auto;}
+#order .on{flex:1 1 auto; font-size:14px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;}
+#order .ob{margin-left:auto; padding-left:6px; font-family:var(--mono); font-size:11px; color:var(--faint); flex:0 0 auto;}
+#order .empty{color:var(--faint); font-size:13px; line-height:1.5; padding:4px 2px;}
+
+/* next */
+#nextCard{
+  border-color:var(--line2);
+  background:linear-gradient(180deg,var(--panel2),var(--panel));
+  display:flex; flex-direction:column;
+}
+#nextCard.soon{border-color:var(--gold-dim); box-shadow:0 0 0 1px rgba(224,168,58,.18) inset;}
+#nextCard.imminent{border-color:var(--red); background:linear-gradient(180deg,#1d0e0a,var(--panel));}
+#nextTitle{
+  font-size:clamp(21px,3.4vw,38px); font-weight:700; line-height:1.08; word-break:break-word;
+}
+#nextCount{
+  font-family:var(--mono); font-weight:600; font-variant-numeric:tabular-nums;
+  font-size:clamp(38px,7.4vw,84px); line-height:1; margin-top:4px; color:var(--gold);
+}
+#nextCard.imminent #nextCount{color:var(--red);}
+#nextNote{margin-top:8px; font-size:clamp(13px,1.7vw,17px); line-height:1.35; color:var(--dim);}
+#nextMeta{
+  margin-top:8px; font-family:var(--mono); font-size:12px; color:var(--faint);
+  letter-spacing:.06em;
+}
+
+/* upcoming list */
+#upcoming{
+  list-style:none; margin:0; padding:0; flex:1; min-height:0; overflow:auto;
+  display:flex; flex-direction:column; gap:6px;
+}
+#upcoming li{
+  display:flex; align-items:baseline; gap:10px;
+  padding:8px 11px; border-radius:9px; background:var(--panel);
+  border:1px solid var(--line); min-width:0;
+}
+#upcoming .ut{
+  font-family:var(--mono); font-size:12.5px; color:var(--gold); font-variant-numeric:tabular-nums;
+  flex:0 0 auto;
+}
+#upcoming .un{font-size:14.5px; color:var(--dim); overflow:hidden; text-overflow:ellipsis; white-space:nowrap;}
+#upcoming .un{flex:1 1 auto;}
+#upcoming .ud{margin-left:auto; padding-left:6px; font-family:var(--mono); font-size:12px; color:var(--faint); flex:0 0 auto;}
+
+.kind{
+  display:inline-block; flex:0 0 auto; width:8px; height:8px; border-radius:2px;
+  background:var(--faint); transform:translateY(-1px);
+}
+.k-song{background:var(--gold);} .k-scene{background:var(--blue);}
+.k-act{background:var(--violet);} .k-cue{background:var(--green);}
+
+/* ---------- timeline ---------- */
+#timelineWrap{padding:0 10px 6px; min-width:0; overflow:hidden;}
+#timeline{
+  position:relative; height:44px; background:var(--panel);
+  border:1px solid var(--line); border-radius:9px; overflow:hidden;
+  touch-action:none;
+}
+#tlActs{position:absolute; inset:0;}
+.tlAct{position:absolute; top:0; bottom:0; border-left:1px solid var(--line2);}
+.tlAct span{
+  position:absolute; top:3px; left:5px; font-family:var(--mono);
+  font-size:9px; letter-spacing:.12em; color:var(--faint); white-space:nowrap;
+}
+.tick{position:absolute; bottom:0; width:2px; height:13px; background:var(--faint); border-radius:1px;}
+.tick.t-song{height:22px; background:var(--gold); width:3px;}
+.tick.t-scene{background:var(--blue);}
+.tick.t-cue{background:var(--green);}
+.tick.t-act{height:100%; width:1px; background:var(--violet); opacity:.55;}
+#tlHead{
+  position:absolute; top:0; bottom:0; width:2px; background:var(--ink);
+  box-shadow:0 0 8px rgba(244,239,228,.6);
+}
+#tlHead::before{
+  content:""; position:absolute; top:-1px; left:-4px; border-left:5px solid transparent;
+  border-right:5px solid transparent; border-top:7px solid var(--ink);
+}
+#tlLabels{
+  display:flex; justify-content:space-between; margin-top:3px;
+  font-family:var(--mono); font-size:9.5px; color:var(--faint); letter-spacing:.08em;
+}
+
+/* ---------- transport ---------- */
+#transport{
+  display:flex; gap:7px; align-items:stretch; padding:8px 10px 10px;
+  background:var(--bg2); border-top:1px solid var(--line); flex-wrap:nowrap;
+  overflow-x:auto; overflow-y:hidden; min-width:0; scrollbar-width:none;
+}
+#transport::-webkit-scrollbar{display:none;}
+.btn{
+  background:var(--panel); border:1px solid var(--line2); border-radius:10px;
+  padding:11px 13px; font-family:var(--mono); font-size:12px; letter-spacing:.08em;
+  color:var(--ink); white-space:nowrap; display:flex; align-items:center; gap:6px;
+  flex:0 0 auto; min-height:46px;
+}
+.btn:active{background:var(--raised); transform:translateY(1px);}
+.btn.wide{flex:1 1 auto; justify-content:center;}
+.btn.play{background:var(--green); border-color:var(--green); color:#062012; font-weight:700; min-width:96px; justify-content:center;}
+body.running .btn.play{background:var(--panel); border-color:var(--line2); color:var(--ink); font-weight:600;}
+.btn.sync{background:#1a1206; border-color:var(--gold-dim); color:var(--gold); font-weight:700;}
+.btn.nudge{padding:11px 10px; color:var(--dim); min-width:52px; justify-content:center;}
+.sep{width:1px; background:var(--line); margin:2px 3px; flex:0 0 auto;}
+
+/* ---------- count-in overlay ---------- */
+#countin{
+  position:fixed; inset:0; z-index:60; display:none;
+  background:rgba(5,6,8,.94); backdrop-filter:blur(3px);
+  flex-direction:column; align-items:center; justify-content:center;
+  padding:24px; text-align:center;
+}
+#countin.show{display:flex;}
+#ciLabel{font-family:var(--mono); font-size:clamp(11px,1.6vw,15px); letter-spacing:.36em; color:var(--gold);}
+#ciTitle{
+  font-size:clamp(24px,4.4vw,52px); font-weight:700; margin-top:6px; line-height:1.05;
+  max-width:92vw; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden;
+}
+#ciBeat{
+  font-family:var(--mono); font-weight:700; font-variant-numeric:tabular-nums;
+  font-size:clamp(120px,32vh,340px); line-height:.9; margin:6px 0;
+  color:var(--ink); transition:color .05s;
+}
+#countin.hit #ciBeat{color:var(--gold);}
+#countin.acc #ciBeat{color:var(--red);}
+#ciDots{display:flex; gap:12px; margin-top:4px;}
+#ciDots i{
+  width:clamp(12px,2vw,22px); height:clamp(12px,2vw,22px); border-radius:50%;
+  background:var(--line2); display:block;
+}
+#ciDots i.on{background:var(--gold);}
+#ciDots i.acc.on{background:var(--red);}
+#ciSub{margin-top:14px; font-family:var(--mono); font-size:clamp(12px,1.8vw,18px); color:var(--dim); letter-spacing:.14em;}
+
+/* ---------- video window ---------- */
+#vidWrap{
+  position:fixed; z-index:40; right:14px; bottom:96px;
+  width:280px; background:#000; border:1px solid var(--line2); border-radius:10px;
+  overflow:hidden; box-shadow:0 12px 34px var(--shadow); touch-action:none;
+}
+#vidWrap.hidden{display:none;}
+#vidWrap video{display:block; width:100%; height:auto; background:#000;}
+#vidBar{
+  display:flex; align-items:center; gap:4px; padding:4px 6px;
+  background:var(--panel2); border-top:1px solid var(--line); cursor:move;
+}
+#vidBar .vlab{font-family:var(--mono); font-size:9.5px; letter-spacing:.12em; color:var(--faint); flex:1;
+  overflow:hidden; text-overflow:ellipsis; white-space:nowrap;}
+.vbtn{
+  background:var(--panel); border:1px solid var(--line2); border-radius:5px;
+  padding:3px 7px; font-family:var(--mono); font-size:10px; color:var(--dim);
+}
+#vidWrap.big{width:min(62vw,760px);}
+#vidWrap.docked{
+  position:static; width:100%; right:auto; bottom:auto; left:auto; top:auto;
+  max-height:100%; box-shadow:none; border:1px solid var(--line); border-radius:8px;
+  display:flex; flex-direction:column;
+}
+/* height:0 + flex-grow lets the picture shrink to the card instead of overflowing it */
+#vidWrap.docked video{flex:1 1 auto; height:0; min-height:0; width:100%; object-fit:contain;}
+#vidWrap.docked #vidBar{flex:0 0 auto; cursor:default;}
+#vidWrap.huge{
+  width:auto; right:0; left:0; top:0; bottom:0; border-radius:0; border:0;
+  display:flex; flex-direction:column; justify-content:center; z-index:35;
+}
+#vidWrap.huge video{max-height:calc(100vh - 34px); width:100%; object-fit:contain;}
+
+/* ---------- drawers / modals ---------- */
+.scrim{
+  position:fixed; inset:0; z-index:70; background:rgba(3,4,6,.72);
+  display:none; align-items:stretch; justify-content:flex-end;
+}
+.scrim.show{display:flex;}
+.drawer{
+  width:min(720px,100%); background:var(--bg2); border-left:1px solid var(--line);
+  display:flex; flex-direction:column;
+  padding-top:var(--safe-t); padding-bottom:var(--safe-b);
+}
+.dhead{
+  display:flex; align-items:center; gap:10px; padding:12px 14px;
+  border-bottom:1px solid var(--line); background:var(--panel);
+}
+.dhead h2{margin:0; font-size:15px; font-family:var(--mono); letter-spacing:.2em; color:var(--gold); flex:1;}
+.dbody{flex:1; overflow:auto; padding:12px 14px 30px; -webkit-overflow-scrolling:touch;}
+.dfoot{display:flex; gap:8px; padding:10px 14px; border-top:1px solid var(--line); background:var(--panel); flex-wrap:wrap;}
+
+.banner{
+  border:1px solid var(--gold-dim); background:#1a1408; color:var(--amber);
+  border-radius:9px; padding:10px 12px; font-size:13px; line-height:1.45; margin-bottom:12px;
+}
+.banner b{color:var(--gold);}
+
+/* cue rows */
+.cueRow{
+  display:grid; grid-template-columns:78px 1fr auto; gap:10px; align-items:center;
+  padding:9px 10px; border:1px solid var(--line); border-radius:9px;
+  background:var(--panel); margin-bottom:6px;
+}
+.cueRow.est{border-left:3px solid var(--amber);}
+.cueRow .ct{font-family:var(--mono); font-size:13px; color:var(--gold); font-variant-numeric:tabular-nums;}
+.cueRow .cn{font-size:14px; overflow:hidden; min-width:0;}
+.cueRow .cn small{display:block; color:var(--faint); font-size:11.5px; margin-top:2px;
+  overflow:hidden; text-overflow:ellipsis; white-space:nowrap;}
+.cueRow .cbtns{display:flex; gap:5px;}
+.mini{
+  background:var(--raised); border:1px solid var(--line2); border-radius:6px;
+  padding:6px 9px; font-family:var(--mono); font-size:11px; color:var(--dim);
+}
+.mini.go{color:var(--green); border-color:#26543c;}
+.mini.stamp{color:var(--gold); border-color:var(--gold-dim);}
+.mini.del{color:var(--red); border-color:#5c2419;}
+
+/* forms */
+.frow{display:flex; gap:10px; align-items:center; margin-bottom:10px; flex-wrap:wrap;}
+.frow label{font-family:var(--mono); font-size:11px; letter-spacing:.12em; color:var(--faint);
+  flex:0 0 128px;}
+.frow .hint{font-size:11.5px; color:var(--faint); flex-basis:100%; margin-top:-4px; line-height:1.4;}
+input[type=text],input[type=number],textarea,select{
+  background:var(--panel); border:1px solid var(--line2); border-radius:8px;
+  padding:10px 11px; color:var(--ink); font-family:var(--sans); font-size:15px;
+  flex:1 1 140px; min-width:0;
+}
+input[type=number]{font-family:var(--mono); flex:0 0 110px;}
+textarea{min-height:66px; resize:vertical; flex-basis:100%; line-height:1.4;}
+input[type=range]{flex:1 1 140px; accent-color:var(--gold);}
+.seg{display:flex; gap:0; border:1px solid var(--line2); border-radius:8px; overflow:hidden;}
+.seg button{background:var(--panel); border:0; padding:9px 13px; font-family:var(--mono);
+  font-size:11.5px; color:var(--dim); border-right:1px solid var(--line2);}
+.seg button:last-child{border-right:0;}
+.seg button.on{background:var(--gold); color:#140d02; font-weight:700;}
+.check{display:flex; align-items:center; gap:8px; font-size:14px; color:var(--dim);}
+.check input{width:22px; height:22px; accent-color:var(--gold);}
+h3.sec{
+  font-family:var(--mono); font-size:11px; letter-spacing:.24em; color:var(--gold);
+  margin:22px 0 10px; padding-bottom:6px; border-bottom:1px solid var(--line);
+}
+h3.sec:first-child{margin-top:0;}
+.note{font-size:12.5px; color:var(--faint); line-height:1.5; margin:6px 0 0;}
+
+/* toast */
+#toast{
+  position:fixed; left:50%; bottom:calc(96px + var(--safe-b)); transform:translateX(-50%);
+  background:var(--raised); border:1px solid var(--line2); border-radius:10px;
+  padding:11px 18px; font-family:var(--mono); font-size:13px; color:var(--ink);
+  z-index:90; opacity:0; pointer-events:none; transition:opacity .18s; white-space:nowrap;
+  box-shadow:0 10px 30px var(--shadow);
+}
+#toast.show{opacity:1;}
+#toast.good{color:var(--green); border-color:#26543c;}
+#toast.warn{color:var(--amber); border-color:var(--gold-dim);}
+
+/* sync picker */
+.syncItem{
+  display:flex; align-items:center; gap:12px; padding:12px 12px; border-radius:10px;
+  background:var(--panel); border:1px solid var(--line); margin-bottom:7px;
+}
+.syncItem .st{font-family:var(--mono); font-size:14px; color:var(--gold); font-variant-numeric:tabular-nums;}
+.syncItem .sn{flex:1; font-size:14.5px; min-width:0;}
+.syncItem .sd{font-family:var(--mono); font-size:12px; color:var(--faint);}
+.hide{display:none !important;}
+</style>
+</head>
+<body class="stopped">
+
+<div id="app">
+
+  <header id="topbar">
+    <div class="brand">METROPOLIS <span>LIVE CUE</span></div>
+    <div class="statuses">
+      <span class="chip" id="chipMode">EXTERNAL</span>
+      <span class="chip" id="chipDrift">SYNC 0.0s</span>
+      <span class="chip" id="chipClick">CLICK OFF</span>
+      <span class="chip" id="chipWake">SCREEN</span>
+      <span class="chip warn hide" id="chipEst">EST TIMES</span>
+    </div>
+    <div class="topbtns">
+      <button class="tbtn" id="btnCues">CUES</button>
+      <button class="tbtn" id="btnSet">SETUP</button>
+      <button class="tbtn" id="btnFull">&#9974;</button>
+    </div>
+  </header>
+
+  <main id="stage">
+    <div class="col">
+      <div class="card" id="clockCard">
+        <div class="label">FILM TIME</div>
+        <div id="clock">0:00:00<small>.0</small></div>
+        <div id="clockSub">
+          <span>LEFT <b id="remain">2:28:00</b></span>
+          <span>REEL <b id="reelPct">0%</b></span>
+          <span id="offsetLine">OFFSET <b id="offsetVal">0.00s</b></span>
+        </div>
+      </div>
+      <div class="card" id="nowCard">
+        <div class="label">NOW PLAYING</div>
+        <div id="nowTitle">— not started —</div>
+        <div id="nowNote"></div>
+        <div id="nowMeta"></div>
+      </div>
+      <div class="card" id="slotCard">
+        <div class="label" id="slotLabel">RUNNING ORDER</div>
+        <div id="filmSlot"></div>
+        <ul id="order"></ul>
+      </div>
+    </div>
+
+    <div class="col">
+      <div class="card" id="nextCard">
+        <div class="label">NEXT</div>
+        <div id="nextTitle">—</div>
+        <div id="nextCount">—:—</div>
+        <div id="nextNote"></div>
+        <div id="nextMeta"></div>
+      </div>
+      <ul id="upcoming"></ul>
+    </div>
+  </main>
+
+  <div id="timelineWrap">
+    <div id="timeline">
+      <div id="tlActs"></div>
+      <div id="tlTicks"></div>
+      <div id="tlHead" style="left:0"></div>
+    </div>
+    <div id="tlLabels"><span>0:00</span><span id="tlMid">1:14:00</span><span id="tlEnd">2:28:00</span></div>
+  </div>
+
+  <footer id="transport">
+    <button class="btn play" id="btnPlay">START</button>
+    <button class="btn sync" id="btnSync">SYNC</button>
+    <div class="sep"></div>
+    <button class="btn nudge" data-nudge="-1">&minus;1s</button>
+    <button class="btn nudge" data-nudge="-0.1">&minus;.1</button>
+    <button class="btn nudge" data-nudge="0.1">+.1</button>
+    <button class="btn nudge" data-nudge="1">+1s</button>
+    <div class="sep"></div>
+    <button class="btn" id="btnPrev">&#9198; CUE</button>
+    <button class="btn" id="btnNext">CUE &#9197;</button>
+    <div class="sep"></div>
+    <button class="btn" id="btnGoto">GO TO&#8230;</button>
+    <button class="btn" id="btnFilm">FILM</button>
+    <button class="btn" id="btnClick">CLICK</button>
+  </footer>
+
+</div>
+
+<!-- count-in takeover -->
+<div id="countin">
+  <div id="ciLabel">COUNT IN</div>
+  <div id="ciTitle">—</div>
+  <div id="ciBeat">4</div>
+  <div id="ciDots"></div>
+  <div id="ciSub">BAR 1 OF 2</div>
+</div>
+
+<!-- floating film window -->
+<div id="vidWrap" class="hidden">
+  <video id="film" playsinline webkit-playsinline muted></video>
+  <div id="vidBar">
+    <span class="vlab" id="vidName">no file</span>
+    <button class="vbtn" data-vsize="docked">DOCK</button>
+    <button class="vbtn" data-vsize="small">FLOAT</button>
+    <button class="vbtn" data-vsize="huge">FULL</button>
+    <button class="vbtn" id="vidHide">&times;</button>
+  </div>
+</div>
+
+<!-- CUES drawer -->
+<div class="scrim" id="cueScrim">
+  <div class="drawer">
+    <div class="dhead">
+      <h2>CUE SHEET</h2>
+      <button class="tbtn" id="cueAdd">+ ADD</button>
+      <button class="tbtn" id="cueStampNext">STAMP NEXT</button>
+      <button class="tbtn" id="cueClose">CLOSE</button>
+    </div>
+    <div class="dbody">
+      <div class="banner hide" id="estBanner">
+        <b>Seed timings are estimates.</b> The scene order is right for the 148-minute
+        <i>Complete Metropolis</i>, but every timecode marked with an amber bar still needs
+        verifying against your print. Play the film and hit <b>STAMP</b> on a row as each moment
+        lands &mdash; that writes the real timecode and clears the flag.
+      </div>
+      <div id="cueList"></div>
+    </div>
+    <div class="dfoot">
+      <button class="btn" id="cueExport">EXPORT</button>
+      <button class="btn" id="cueImport">IMPORT</button>
+      <button class="btn" id="cueReset">RESET TO SEED</button>
+      <input type="file" id="importFile" accept="application/json,.json" class="hide">
+    </div>
+  </div>
+</div>
+
+<!-- EDIT one cue -->
+<div class="scrim" id="editScrim">
+  <div class="drawer">
+    <div class="dhead">
+      <h2 id="editHead">EDIT CUE</h2>
+      <button class="tbtn" id="editClose">CLOSE</button>
+    </div>
+    <div class="dbody">
+      <h3 class="sec">WHAT &amp; WHEN</h3>
+      <div class="frow">
+        <label>TITLE</label>
+        <input type="text" id="eTitle" placeholder="e.g. Moloch — main theme">
+      </div>
+      <div class="frow">
+        <label>TIMECODE</label>
+        <input type="text" id="eTime" placeholder="1:02:33.5" style="flex:0 0 150px">
+        <button class="mini stamp" id="eStamp">SET TO PLAYHEAD</button>
+      </div>
+      <div class="frow">
+        <label>KIND</label>
+        <div class="seg" id="eKind">
+          <button data-k="song">SONG</button>
+          <button data-k="cue">CUE</button>
+          <button data-k="scene">SCENE</button>
+          <button data-k="act">ACT</button>
+        </div>
+      </div>
+      <div class="frow">
+        <label>HEADS-UP</label>
+        <textarea id="eNote" placeholder="What is about to happen on screen, and what you do about it."></textarea>
+      </div>
+      <div class="frow">
+        <label>LEAD TIME</label>
+        <input type="number" id="eLead" min="0" max="600" step="5" placeholder="default">
+        <span class="hint">Seconds before the cue that it takes over the NEXT panel. Blank = use the global default.</span>
+      </div>
+
+      <h3 class="sec">COUNT-IN</h3>
+      <div class="frow">
+        <label>TEMPO</label>
+        <input type="number" id="eBpm" min="20" max="300" step="0.5" placeholder="—">
+        <span style="font-family:var(--mono);font-size:12px;color:var(--faint)">BPM</span>
+        <input type="number" id="eSig" min="1" max="16" step="1" placeholder="4" style="flex:0 0 76px">
+        <span style="font-family:var(--mono);font-size:12px;color:var(--faint)">BEATS / BAR</span>
+      </div>
+      <div class="frow">
+        <label>COUNT-IN BARS</label>
+        <input type="number" id="eBars" min="0" max="8" step="1" placeholder="1">
+        <span class="hint">Leave tempo blank for cues that need no count-in. With a tempo set, the
+          full-screen count-in takes over that many bars before the downbeat, and a bar|beat readout
+          keeps running once the song is under way.</span>
+      </div>
+
+      <h3 class="sec">SYNC</h3>
+      <div class="frow">
+        <label class="check" style="flex:1">
+          <input type="checkbox" id="eSync">
+          <span>Usable as a sync point &mdash; an unmistakable frame you can hit SYNC on</span>
+        </label>
+      </div>
+      <div class="frow">
+        <label class="check" style="flex:1">
+          <input type="checkbox" id="eEst">
+          <span>Timecode is still an estimate</span>
+        </label>
+      </div>
+    </div>
+    <div class="dfoot">
+      <button class="btn wide" id="eSave" style="background:var(--gold);border-color:var(--gold);color:#140d02;font-weight:700">SAVE</button>
+      <button class="btn" id="eDelete" style="color:var(--red);border-color:#5c2419">DELETE</button>
+    </div>
+  </div>
+</div>
+
+<!-- SYNC picker -->
+<div class="scrim" id="syncScrim">
+  <div class="drawer">
+    <div class="dhead">
+      <h2>SYNC TO A LANDMARK</h2>
+      <button class="tbtn" id="syncClose">CLOSE</button>
+    </div>
+    <div class="dbody">
+      <div class="banner">
+        Tap a landmark <b>at the instant it hits the screen</b>. The clock jumps to that timecode,
+        with your tap-latency allowance taken off. Nearest landmarks to the current position are listed first.
+      </div>
+      <div id="syncList"></div>
+    </div>
+  </div>
+</div>
+
+<!-- GO TO picker -->
+<div class="scrim" id="gotoScrim">
+  <div class="drawer">
+    <div class="dhead">
+      <h2>GO TO</h2>
+      <button class="tbtn" id="gotoClose">CLOSE</button>
+    </div>
+    <div class="dbody">
+      <div class="frow">
+        <label>TIMECODE</label>
+        <input type="text" id="gotoTime" placeholder="1:02:33" style="flex:0 0 160px">
+        <button class="mini go" id="gotoJump">GO</button>
+      </div>
+      <div class="frow">
+        <label class="check" style="flex:1">
+          <input type="checkbox" id="gotoRoll" checked>
+          <span>Pre-roll &mdash; start early so the approach and count-in play out</span>
+        </label>
+      </div>
+      <h3 class="sec">JUMP TO A CUE</h3>
+      <div id="gotoList"></div>
+    </div>
+  </div>
+</div>
+
+<!-- SETUP drawer -->
+<div class="scrim" id="setScrim">
+  <div class="drawer">
+    <div class="dhead">
+      <h2>SETUP</h2>
+      <button class="tbtn" id="setClose">CLOSE</button>
+    </div>
+    <div class="dbody">
+      <h3 class="sec">FILM WINDOW</h3>
+      <div class="frow">
+        <label>VIDEO FILE</label>
+        <input type="file" id="videoFile" accept="video/*" style="flex:1 1 200px">
+      </div>
+      <p class="note">Pick your copy of the film and the app drives its own clock from the video &mdash;
+        no calibration needed, scrubbing and pre-roll seek the picture with you. Nothing is uploaded;
+        the file never leaves the iPad. Leave it empty when the film comes from a projector or another
+        machine and the app will free-run instead, which is what the sync points are for.
+        iPadOS forgets the file on reload, so re-pick it after a restart.</p>
+      <div class="frow">
+        <label>START OFFSET</label>
+        <input type="number" id="setVidOffset" step="0.1" placeholder="0">
+        <span class="hint">Seconds to add to the video's own time to get film time. Use it if your file
+          carries a leader, a logo, or a black head before frame one of the picture.</span>
+      </div>
+
+      <h3 class="sec">TIMING</h3>
+      <div class="frow">
+        <label>FILM LENGTH</label>
+        <input type="text" id="setDur" placeholder="2:28:00" style="flex:0 0 140px">
+        <span class="hint">Only drives the timeline scale and the remaining-time readout.</span>
+      </div>
+      <div class="frow">
+        <label>DEFAULT LEAD</label>
+        <input type="number" id="setLead" min="5" max="600" step="5">
+        <span class="hint">Seconds of warning for cues with no lead time of their own.</span>
+      </div>
+      <div class="frow">
+        <label>CLOCK RATE</label>
+        <input type="number" id="setRate" min="0.9" max="1.1" step="0.0001">
+        <button class="mini stamp" id="setRateAuto">USE MEASURED</button>
+        <span class="hint" id="rateHint">Free-run only. 1 means the app's clock runs at real time.
+          Sync twice, at least two minutes apart, and the second tap measures how far the clock is
+          drifting against the print &mdash; then this button applies the correction.</span>
+      </div>
+      <div class="frow">
+        <label>TAP LATENCY</label>
+        <input type="number" id="setLatency" min="0" max="1000" step="10">
+        <span class="hint">Milliseconds taken off every SYNC tap to allow for your reaction time. 150 is a fair start.</span>
+      </div>
+
+      <h3 class="sec">CLICK</h3>
+      <div class="frow">
+        <label>MODE</label>
+        <div class="seg" id="setClickMode">
+          <button data-c="off">OFF</button>
+          <button data-c="countin">COUNT-IN</button>
+          <button data-c="always">THROUGH</button>
+        </div>
+      </div>
+      <div class="frow">
+        <label>LEVEL</label>
+        <input type="range" id="setVol" min="0" max="1" step="0.05">
+        <button class="mini" id="setTestClick">TEST</button>
+      </div>
+      <p class="note">A guide click for rehearsal, on the iPad speaker or whatever it is plugged into.
+        Count-in mode clicks only through the bars before a downbeat; through mode keeps clicking for
+        the length of the song.</p>
+
+      <h3 class="sec">SCREEN</h3>
+      <div class="frow">
+        <label class="check" style="flex:1">
+          <input type="checkbox" id="setWake" checked>
+          <span>Keep the screen awake while running</span>
+        </label>
+      </div>
+      <div class="frow">
+        <label class="check" style="flex:1">
+          <input type="checkbox" id="setFlash" checked>
+          <span>Flash the count-in overlay full screen</span>
+        </label>
+      </div>
+      <p class="note">For a proper full-screen app on the iPad: open this page in Safari, Share &rarr;
+        Add to Home Screen, then launch it from the icon. It runs without browser chrome and stays
+        available with the wifi off.</p>
+
+      <h3 class="sec">SHOW</h3>
+      <div class="frow">
+        <label>SHOW NAME</label>
+        <input type="text" id="setShow" placeholder="Metropolis — live score">
+      </div>
+      <p class="note" id="verNote"></p>
+    </div>
+    <div class="dfoot">
+      <button class="btn" id="setExportAll">EXPORT EVERYTHING</button>
+      <button class="btn" id="setWipe" style="color:var(--red);border-color:#5c2419">WIPE LOCAL DATA</button>
+    </div>
+  </div>
+</div>
+
+<div id="toast"></div>
+
+<script>
+'use strict';
+
+/* =====================================================================
+   Metropolis — Live Cue
+   Single-file cue display for playing live to the 148-minute
+   "Complete Metropolis". No network, no dependencies, no build step.
+   ===================================================================== */
+
+var VERSION = '1.0';
+var STORE_KEY = 'metropolis.livecue.v1';
+
+/* ------------------------------ helpers ------------------------------ */
+function $(id){ return document.getElementById(id); }
+function el(tag, cls, txt){
+  var n = document.createElement(tag);
+  if(cls) n.className = cls;
+  if(txt != null) n.textContent = txt;
+  return n;
+}
+function clamp(v, lo, hi){ return v < lo ? lo : (v > hi ? hi : v); }
+function nowSec(){ return performance.now() / 1000; }
+function uid(){ return 'c' + Math.random().toString(36).slice(2, 9); }
+
+/* 3725.5 -> "1:02:05" (tenths optional) */
+function fmtTC(s, tenths){
+  var neg = s < 0;
+  if(neg) s = -s;
+  var t = Math.floor(s);
+  var h = Math.floor(t / 3600);
+  var m = Math.floor((t % 3600) / 60);
+  var sec = t % 60;
+  var out = h + ':' + String(m).padStart(2, '0') + ':' + String(sec).padStart(2, '0');
+  if(tenths) out += '.' + Math.floor((s - t) * 10);
+  return (neg ? '−' : '') + out;
+}
+/* 95 -> "1:35" for countdowns */
+function fmtShort(s){
+  var neg = s < 0;
+  if(neg) s = -s;
+  var t = Math.floor(s);
+  var m = Math.floor(t / 60), sec = t % 60;
+  if(m >= 60) return (neg ? '−' : '') + Math.floor(m / 60) + ':' + String(m % 60).padStart(2, '0') + ':' + String(sec).padStart(2, '0');
+  return (neg ? '−' : '') + m + ':' + String(sec).padStart(2, '0');
+}
+/* "1:02:33.5" | "62:33" | "3725" -> seconds ; null if unparseable */
+function parseTC(str){
+  if(str == null) return null;
+  str = String(str).trim().replace(',', '.');
+  if(!str) return null;
+  var sign = 1;
+  if(str[0] === '-' || str[0] === '−'){ sign = -1; str = str.slice(1); }
+  var parts = str.split(':');
+  if(parts.some(function(p){ return p !== '' && isNaN(Number(p)); })) return null;
+  var v = 0;
+  if(parts.length === 1) v = Number(parts[0]);
+  else if(parts.length === 2) v = Number(parts[0]) * 60 + Number(parts[1]);
+  else if(parts.length === 3) v = Number(parts[0]) * 3600 + Number(parts[1]) * 60 + Number(parts[2]);
+  else return null;
+  if(isNaN(v)) return null;
+  return sign * v;
+}
+var toastTimer = null;
+function toast(msg, kind){
+  var t = $('toast');
+  t.textContent = msg;
+  t.className = 'show' + (kind ? ' ' + kind : '');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(function(){ t.className = ''; }, 2200);
+}
+
+/* --------------------------- the seed sheet ---------------------------
+   Scene ORDER below is the running order of the 2010 restoration.
+   Every timecode is an ESTIMATE (est:true) and is meant to be replaced by
+   stamping it against your own print. Nothing here is a claim of accuracy.
+---------------------------------------------------------------------- */
+function seedCues(){
+  var raw = [
+    [0,        'act',   'VORSPIEL — Prelude', '', 1],
+    [0,        'scene', 'Film start — first frame of picture', 'Zero the clock here. This is the reference every other timecode hangs off.', 1],
+    [80,       'scene', 'Shift change — the ten-hour clock', 'Pistons, the whistle, the column of workers trudging into the lift.', 1],
+    [270,      'scene', 'The Eternal Gardens — Freder', 'Fountains, the peacock, Freder chasing the girl.', 0],
+    [370,      'scene', 'Maria at the gate — "These are your brothers"', 'The doors open, the children, Freder frozen. Unmistakable frame.', 1],
+    [500,      'scene', 'Freder descends to the machine halls', '', 0],
+    [600,      'scene', 'The M-Machine becomes Moloch', 'Explosion, the vision of the maw, workers fed into it. Big one.', 1],
+    [810,      'scene', 'New Tower of Babel — Joh Fredersen’s office', '', 0],
+    [1020,     'scene', 'Josaphat dismissed', '', 0],
+    [1170,     'scene', 'Freder takes 11811’s place at the clock-dial machine', 'The crucifixion pose on the dial. "Father — will ten hours never end?"', 1],
+    [1440,     'scene', 'Georgy 11811 and the taxi to Yoshiwara', '', 0],
+    [1650,     'scene', 'Rotwang’s house — the Machine-Man revealed', 'The seated robot, the reveal. Unmistakable frame.', 1],
+    [1980,     'scene', 'Fredersen and Rotwang read the plans of the catacombs', '', 0],
+    [2280,     'scene', 'The catacombs — Maria preaches the Tower of Babel', 'Sea of candles, then the long Babel flashback.', 1],
+    [2760,     'scene', 'Freder and Maria — the mediator', '"The mediator between head and hands must be the heart."', 0],
+    [3000,     'scene', 'Fredersen orders Maria’s face put on the Machine-Man', '', 0],
+    [3300,     'scene', 'Rotwang hunts Maria through the catacombs', 'The torch beam pinning her against the rock. Very findable.', 1],
+    [3720,     'scene', 'Freder searches / Josaphat and the Thin Man', '', 0],
+    [4140,     'scene', 'Rotwang seizes Maria at the window', '', 0],
+    [4440,     'scene', 'The transformation — rings of light', 'The famous one. Rings travelling up the robot, Maria’s face forming.', 1],
+
+    [4920,     'act',   'ZWISCHENSPIEL — Intermezzo', '', 1],
+    [4980,     'scene', 'The Thin Man shadows Josaphat', '', 0],
+    [5280,     'scene', 'Freder finds the false Maria in his father’s arms — collapses', '', 1],
+    [5580,     'scene', 'Fever visions — the Seven Deadly Sins, Death with the scythe', 'The statues coming alive, the scythe swing.', 1],
+    [5880,     'scene', 'Yoshiwara — the dance of the false Maria', 'The dance, the ring of eyes.', 1],
+    [6180,     'scene', 'The Whore of Babylon vision', '', 0],
+
+    [6420,     'act',   'FURIOSO — Finale', '', 1],
+    [6480,     'scene', 'The false Maria incites the workers in the catacombs', '"Who is the living food for the machines?"', 1],
+    [6840,     'scene', 'The workers leave the machines — Grot’s warning', '', 0],
+    [7080,     'scene', 'The Heart Machine destroyed', 'Grot beaten back, the wheel torn open, the steam.', 1],
+    [7320,     'scene', 'The workers’ city floods', 'Water through the streets, the children swarming to the gong.', 1],
+    [7560,     'scene', 'Maria and the children — the gong', '', 0],
+    [7860,     'scene', 'The children brought up through the shaft', '', 0],
+    [8100,     'scene', 'The mob burns the false Maria at the stake', 'The robot laughing in the flames, then the metal showing through.', 1],
+    [8340,     'scene', 'Rooftop chase — Freder and Rotwang above the cathedral', '', 1],
+    [8640,     'scene', 'The handshake — head, hands, heart', 'Grot and Fredersen, Freder’s hands joining them. The last image.', 1],
+    [8820,     'scene', 'END TITLE', '', 1]
+  ];
+  var cues = raw.map(function(r){
+    return {
+      id: uid(), t: r[0], kind: r[1], title: r[2], note: r[3] || '',
+      sync: !!r[4], est: true, bpm: null, sig: 4, bars: 1, lead: null
+    };
+  });
+  /* Two worked examples so the count-in is visible on first run. Delete them. */
+  cues.push({
+    id: uid(), t: 600, kind: 'song', title: 'EXAMPLE — "Moloch" (delete me)',
+    note: 'Example song cue. It shows how a tempo turns into a full-screen count-in: two bars of 4 at 96bpm land the downbeat on the explosion.',
+    sync: false, est: true, bpm: 96, sig: 4, bars: 2, lead: 90
+  });
+  cues.push({
+    id: uid(), t: 7080, kind: 'song', title: 'EXAMPLE — "Heart Machine" (delete me)',
+    note: 'Example song cue in 6/8 at 132. Delete both examples once your own sheet is in.',
+    sync: false, est: true, bpm: 132, sig: 6, bars: 1, lead: 120
+  });
+  cues.sort(function(a, b){ return a.t - b.t; });
+  return cues;
+}
+
+function defaultSettings(){
+  return {
+    show: 'Metropolis — live score',
+    dur: 8880,          /* 2:28:00 */
+    lead: 60,           /* default heads-up, seconds */
+    latency: 150,       /* SYNC tap latency allowance, ms */
+    clickMode: 'off',
+    vol: 0.5,
+    wake: true,
+    flash: true,
+    vidOffset: 0,
+    preroll: 15,
+    lastVideoName: '',
+    vidSize: 'docked',
+    rate: 1
+  };
+}
+
+/* ------------------------------- state ------------------------------- */
+var CUES = [];
+var SET = defaultSettings();
+
+function load(){
+  try{
+    var raw = localStorage.getItem(STORE_KEY);
+    if(raw){
+      var d = JSON.parse(raw);
+      if(d && Array.isArray(d.cues) && d.cues.length){
+        CUES = d.cues.map(normaliseCue);
+        SET = Object.assign(defaultSettings(), d.set || {});
+        sortCues();
+        return;
+      }
+    }
+  }catch(e){ /* fall through to seed */ }
+  CUES = seedCues();
+  SET = defaultSettings();
+}
+function normaliseCue(c){
+  return {
+    id: c.id || uid(),
+    t: Number(c.t) || 0,
+    kind: ['song', 'cue', 'scene', 'act'].indexOf(c.kind) >= 0 ? c.kind : 'cue',
+    title: c.title || 'Untitled',
+    note: c.note || '',
+    sync: !!c.sync,
+    est: !!c.est,
+    bpm: c.bpm ? Number(c.bpm) : null,
+    sig: Number(c.sig) || 4,
+    bars: c.bars == null ? 1 : Number(c.bars),
+    lead: c.lead == null || c.lead === '' ? null : Number(c.lead)
+  };
+}
+var saveTimer = null;
+function save(){
+  clearTimeout(saveTimer);
+  saveTimer = setTimeout(function(){
+    try{
+      localStorage.setItem(STORE_KEY, JSON.stringify({ v: VERSION, cues: CUES, set: SET }));
+    }catch(e){ toast('Could not save locally', 'warn'); }
+  }, 250);
+}
+function sortCues(){ CUES.sort(function(a, b){ return a.t - b.t || (a.kind === 'act' ? -1 : 1); }); }
+
+/* ----------------------------- transport ----------------------------- */
+var vid = $('film');
+var T = { running: false, anchorFilm: 0, anchorWall: 0, hasVideo: false };
+
+function filmTime(){
+  if(T.hasVideo) return vid.currentTime + SET.vidOffset;
+  if(!T.running) return T.anchorFilm;
+  return T.anchorFilm + (nowSec() - T.anchorWall) * SET.rate;
+}
+function setFilmTime(t){
+  t = clamp(t, 0, Math.max(SET.dur, 60) + 600);
+  if(T.hasVideo){
+    try{ vid.currentTime = clamp(t - SET.vidOffset, 0, vid.duration || 1e9); }catch(e){}
+  }else{
+    T.anchorFilm = t;
+    T.anchorWall = nowSec();
+  }
+  resetClickGrid();
+}
+function nudge(d){
+  if(T.hasVideo){ setFilmTime(filmTime() + d); }
+  else{
+    var f = filmTime();
+    T.anchorFilm = f + d;
+    T.anchorWall = nowSec();
+  }
+  resetClickGrid();
+  toast((d > 0 ? '+' : '') + d.toFixed(d % 1 ? 1 : 0) + 's  →  ' + fmtTC(filmTime(), true));
+}
+function play(){
+  unlockAudio();
+  if(T.hasVideo){
+    var p = vid.play();
+    if(p && p.catch) p.catch(function(){ toast('Tap the film window once to allow playback', 'warn'); });
+  }else{
+    if(T.running) return;
+    T.anchorWall = nowSec();
+    T.running = true;
+  }
+  requestWake();
+  resetClickGrid();
+  reflectRunning();
+}
+function pause(){
+  if(T.hasVideo){ vid.pause(); }
+  else{
+    if(!T.running) return;
+    T.anchorFilm = filmTime();
+    T.running = false;
+  }
+  reflectRunning();
+}
+function toggle(){ (isRunning() ? pause : play)(); }
+function isRunning(){ return T.hasVideo ? !vid.paused && !vid.ended : T.running; }
+function reflectRunning(){
+  var r = isRunning();
+  document.body.classList.toggle('running', r);
+  document.body.classList.toggle('stopped', !r);
+  $('btnPlay').textContent = r ? 'PAUSE' : 'START';
+}
+vid.addEventListener('play', reflectRunning);
+vid.addEventListener('pause', reflectRunning);
+
+/* -------------------------- cue interrogation ------------------------- */
+function leadOf(c){ return c.lead == null ? SET.lead : c.lead; }
+function beatDur(c){ return 60 / c.bpm; }
+function countInLen(c){
+  if(!c.bpm || !c.bars) return 0;
+  return c.bars * (c.sig || 4) * beatDur(c);
+}
+function countInStart(c){ return c.t - countInLen(c); }
+
+/* last cue at or before t, ignoring act markers */
+function cueNow(t){
+  var found = null;
+  for(var i = 0; i < CUES.length; i++){
+    if(CUES[i].kind === 'act') continue;
+    if(CUES[i].t <= t) found = CUES[i]; else break;
+  }
+  return found;
+}
+function actNow(t){
+  var found = null;
+  for(var i = 0; i < CUES.length; i++){
+    if(CUES[i].kind === 'act' && CUES[i].t <= t) found = CUES[i];
+  }
+  return found;
+}
+/* upcoming cues after t, act markers included */
+function cuesAfter(t, n){
+  var out = [];
+  for(var i = 0; i < CUES.length && out.length < n; i++){
+    if(CUES[i].t > t) out.push(CUES[i]);
+  }
+  return out;
+}
+/* the cue whose count-in is running right now, if any */
+function activeCountIn(t){
+  for(var i = 0; i < CUES.length; i++){
+    var c = CUES[i];
+    if(!c.bpm || !c.bars) continue;
+    if(t >= countInStart(c) && t < c.t) return c;
+  }
+  return null;
+}
+/* end of a cue's territory: the next non-act cue, or +12 minutes */
+function cueEnd(c){
+  for(var i = 0; i < CUES.length; i++){
+    if(CUES[i].kind !== 'act' && CUES[i].t > c.t) return CUES[i].t;
+  }
+  return c.t + 720;
+}
+
+/* ------------------------------- click -------------------------------- */
+var actx = null, scheduled = {}, schedGrid = '';
+function unlockAudio(){
+  if(!actx){
+    var AC = window.AudioContext || window.webkitAudioContext;
+    if(!AC) return null;
+    actx = new AC();
+  }
+  if(actx.state === 'suspended') actx.resume();
+  return actx;
+}
+function resetClickGrid(){ scheduled = {}; schedGrid = ''; }
+function blip(when, accent){
+  if(!actx || SET.vol <= 0) return;
+  var o = actx.createOscillator(), g = actx.createGain();
+  o.type = 'square';
+  o.frequency.value = accent ? 1720 : 1050;
+  var peak = SET.vol * (accent ? 0.5 : 0.3);
+  g.gain.setValueAtTime(0.0001, when);
+  g.gain.linearRampToValueAtTime(peak, when + 0.002);
+  g.gain.exponentialRampToValueAtTime(0.0001, when + 0.05);
+  o.connect(g); g.connect(actx.destination);
+  o.start(when); o.stop(when + 0.07);
+}
+/* the tempo grid in force at film-time t, anchored on the song downbeat */
+function gridAt(t){
+  for(var i = 0; i < CUES.length; i++){
+    var c = CUES[i];
+    if(!c.bpm) continue;
+    var from = countInStart(c), to = cueEnd(c);
+    if(t >= from && t < to) return { c: c, from: from, to: to };
+  }
+  return null;
+}
+function scheduleClicks(){
+  if(SET.clickMode === 'off' || !actx || !isRunning()) return;
+  var t = filmTime();
+  var g = gridAt(t);
+  if(!g){ schedGrid = ''; return; }
+  if(schedGrid !== g.c.id){ schedGrid = g.c.id; scheduled = {}; }
+  var bd = beatDur(g.c), sig = g.c.sig || 4;
+  var horizon = t + 0.3;
+  var i = Math.ceil((t - g.c.t) / bd) - 1;
+  for(; ; i++){
+    var bt = g.c.t + i * bd;
+    if(bt >= horizon) break;
+    if(bt < t - 0.01 || bt < g.from - 0.001 || bt >= g.to) continue;
+    if(SET.clickMode === 'countin' && i > 0) continue;
+    if(scheduled[i]) continue;
+    scheduled[i] = 1;
+    /* i is the beat index relative to the downbeat; may be negative */
+    var pos = ((i % sig) + sig) % sig;
+    blip(actx.currentTime + (bt - t), pos === 0);
+  }
+}
+setInterval(scheduleClicks, 25);
+
+/* ------------------------------ rendering ----------------------------- */
+var ui = {
+  clock: $('clock'), remain: $('remain'), reelPct: $('reelPct'), offsetVal: $('offsetVal'),
+  nowTitle: $('nowTitle'), nowNote: $('nowNote'), nowMeta: $('nowMeta'),
+  nextCard: $('nextCard'), nextTitle: $('nextTitle'), nextCount: $('nextCount'),
+  nextNote: $('nextNote'), nextMeta: $('nextMeta'), upcoming: $('upcoming'),
+  head: $('tlHead'), ci: $('countin'), ciTitle: $('ciTitle'), ciBeat: $('ciBeat'),
+  ciDots: $('ciDots'), ciSub: $('ciSub'), ciLabel: $('ciLabel')
+};
+var last = { clock: '', now: '', next: '', up: '', ciBeat: null, dots: 0 };
+
+function render(){
+  var t = filmTime();
+
+  /* clock */
+  var cs = fmtTC(t);
+  var frac = Math.floor(Math.abs(t % 1) * 10);
+  if(last.clock !== cs + frac){
+    ui.clock.innerHTML = cs + '<small>.' + frac + '</small>';
+    last.clock = cs + frac;
+    ui.remain.textContent = fmtTC(Math.max(0, SET.dur - t));
+    ui.reelPct.textContent = Math.round(clamp(t / SET.dur, 0, 1) * 100) + '%';
+  }
+  ui.head.style.left = (clamp(t / SET.dur, 0, 1) * 100) + '%';
+
+  /* now */
+  var nc = cueNow(t), ac = actNow(t);
+  var nkey = (nc ? nc.id : '-') + (ac ? ac.id : '-');
+  if(last.now !== nkey){
+    last.now = nkey;
+    ui.nowTitle.textContent = nc ? nc.title : '— before the first cue —';
+    ui.nowNote.textContent = nc ? nc.note : '';
+    ui.nowNote.style.display = nc && nc.note ? '' : 'none';
+  }
+  ui.nowMeta.innerHTML = '';
+  if(ac) ui.nowMeta.appendChild(el('span', null, ac.title));
+  if(nc){
+    ui.nowMeta.appendChild(el('span', null, 'IN ' + fmtShort(t - nc.t)));
+    if(nc.bpm && t >= nc.t && t < cueEnd(nc)){
+      var bd = beatDur(nc), sig = nc.sig || 4;
+      var bi = Math.floor((t - nc.t) / bd);
+      ui.nowMeta.appendChild(el('span', 'bt', 'BAR ' + (Math.floor(bi / sig) + 1) + ' · ' + (bi % sig + 1)));
+      ui.nowMeta.appendChild(el('span', null, '♩=' + nc.bpm));
+    }
+  }
+
+  /* next */
+  var up = cuesAfter(t, 9);
+  var nx = up[0];
+  if(nx){
+    var away = nx.t - t;
+    var lead = leadOf(nx);
+    if(last.next !== nx.id){
+      last.next = nx.id;
+      ui.nextTitle.textContent = nx.title;
+      ui.nextNote.textContent = nx.note;
+      ui.nextNote.style.display = nx.note ? '' : 'none';
+      var meta = 'AT ' + fmtTC(nx.t) + '  ·  ' + nx.kind.toUpperCase();
+      if(nx.bpm) meta += '  ·  ♩=' + nx.bpm + ' · ' + (nx.bars || 0) + ' BAR IN';
+      if(nx.est) meta += '  ·  ESTIMATE';
+      ui.nextMeta.textContent = meta;
+    }
+    ui.nextCount.textContent = away > 5940 ? fmtTC(away) : fmtShort(away);
+    ui.nextCard.classList.toggle('soon', away <= lead);
+    ui.nextCard.classList.toggle('imminent', away <= 10);
+  }else{
+    if(last.next !== 'none'){
+      last.next = 'none';
+      ui.nextTitle.textContent = '— end of sheet —';
+      ui.nextNote.textContent = '';
+      ui.nextMeta.textContent = '';
+      ui.nextCount.textContent = '—';
+      ui.nextCard.classList.remove('soon', 'imminent');
+    }
+  }
+
+  /* upcoming */
+  var ukey = up.map(function(c){ return c.id; }).join(',');
+  if(last.up !== ukey){
+    last.up = ukey;
+    ui.upcoming.innerHTML = '';
+    up.slice(1).forEach(function(c){
+      var li = el('li');
+      li.appendChild(el('i', 'kind k-' + c.kind));
+      li.appendChild(el('span', 'ut', fmtTC(c.t)));
+      li.appendChild(el('span', 'un', c.title));
+      var d = el('span', 'ud', '');
+      d.dataset.t = c.t;
+      li.appendChild(d);
+      li.addEventListener('click', function(){ openGoto(c); });
+      ui.upcoming.appendChild(li);
+    });
+  }
+  var ds = ui.upcoming.querySelectorAll('.ud');
+  for(var i = 0; i < ds.length; i++) ds[i].textContent = '+' + fmtShort(Number(ds[i].dataset.t) - t);
+
+  /* running order highlight */
+  if(last.orderT === undefined || Math.abs(t - last.orderT) > 0.5){
+    last.orderT = t;
+    markOrder(t);
+  }
+
+  /* count-in takeover */
+  var ci = SET.flash ? activeCountIn(t) : null;
+  if(ci){
+    var cbd = beatDur(ci), csig = ci.sig || 4;
+    var elapsed = t - countInStart(ci);
+    var bi = Math.floor(elapsed / cbd);
+    var total = ci.bars * csig;
+    var beat = bi % csig + 1;
+    var bar = Math.floor(bi / csig) + 1;
+    if(!ui.ci.classList.contains('show')){
+      ui.ci.classList.add('show');
+      ui.ciTitle.textContent = ci.title;
+      ui.ciDots.innerHTML = '';
+      for(var k = 0; k < csig; k++){
+        var dot = el('i');
+        if(k === 0) dot.className = 'acc';
+        ui.ciDots.appendChild(dot);
+      }
+      last.ciBeat = null;
+    }
+    if(last.ciBeat !== bi){
+      last.ciBeat = bi;
+      ui.ciBeat.textContent = String(beat);
+      ui.ciSub.textContent = 'BAR ' + bar + ' OF ' + ci.bars + '  ·  ♩=' + ci.bpm + '  ·  ' + (total - bi) + ' TO GO';
+      var dots = ui.ciDots.children;
+      for(var j = 0; j < dots.length; j++) dots[j].classList.toggle('on', j <= beat - 1);
+    }
+    var into = (elapsed % cbd) / cbd;
+    ui.ci.classList.toggle('hit', into < 0.16);
+    ui.ci.classList.toggle('acc', into < 0.16 && beat === 1);
+  }else if(ui.ci.classList.contains('show')){
+    ui.ci.classList.remove('show', 'hit', 'acc');
+  }
+
+  requestAnimationFrame(render);
+}
+
+/* --------------------------- running order ---------------------------- */
+function renderOrder(){
+  var box = $('order');
+  box.innerHTML = '';
+  var songs = CUES.filter(function(c){ return c.kind === 'song'; });
+  if(!songs.length){
+    box.appendChild(el('div', 'empty',
+      'No cues are marked SONG yet. Set a cue’s kind to SONG and it shows up here as your running order — ' +
+      'give it a tempo and it gets a count-in too.'));
+    return;
+  }
+  songs.forEach(function(c){
+    var li = el('li');
+    li.dataset.id = c.id;
+    li.dataset.t = c.t;
+    li.appendChild(el('span', 'ot', fmtTC(c.t)));
+    li.appendChild(el('span', 'on', c.title));
+    li.appendChild(el('span', 'ob', c.bpm ? '♩' + c.bpm + ' · ' + (c.sig || 4) + '/4' : '—'));
+    li.addEventListener('click', function(){ gotoCue(c, true); });
+    box.appendChild(li);
+  });
+}
+function markOrder(t){
+  var lis = $('order').children, nextFound = false;
+  for(var i = 0; i < lis.length; i++){
+    var li = lis[i];
+    if(!li.dataset.t) continue;
+    var ct = Number(li.dataset.t);
+    var isNow = ct <= t && (i + 1 >= lis.length || Number(lis[i + 1].dataset.t) > t);
+    var isNext = !nextFound && ct > t;
+    if(isNext) nextFound = true;
+    li.className = (ct < t && !isNow ? 'past' : '') + (isNow ? ' now' : '') + (isNext ? ' next' : '');
+  }
+}
+function updateSlot(){
+  var docked = T.hasVideo && $('vidWrap').classList.contains('docked') && !$('vidWrap').classList.contains('hidden');
+  $('slotCard').classList.toggle('film', docked);
+  $('slotLabel').textContent = docked ? (SET.lastVideoName || 'FILM') : 'RUNNING ORDER';
+}
+
+/* ------------------------------ timeline ------------------------------ */
+function drawTimeline(){
+  var ticks = $('tlTicks'), acts = $('tlActs');
+  ticks.innerHTML = ''; acts.innerHTML = '';
+  CUES.forEach(function(c){
+    var x = clamp(c.t / SET.dur, 0, 1) * 100;
+    if(c.kind === 'act'){
+      var a = el('div', 'tlAct');
+      a.style.left = x + '%';
+      a.appendChild(el('span', null, c.title.split('—')[0].trim()));
+      acts.appendChild(a);
+    }
+    var d = el('div', 'tick t-' + c.kind);
+    d.style.left = x + '%';
+    ticks.appendChild(d);
+  });
+  $('tlMid').textContent = fmtTC(SET.dur / 2);
+  $('tlEnd').textContent = fmtTC(SET.dur);
+}
+(function(){
+  var tl = $('timeline'), dragging = false;
+  function at(e){
+    var r = tl.getBoundingClientRect();
+    var cx = (e.touches ? e.touches[0].clientX : e.clientX);
+    setFilmTime(clamp((cx - r.left) / r.width, 0, 1) * SET.dur);
+  }
+  tl.addEventListener('pointerdown', function(e){ dragging = true; tl.setPointerCapture(e.pointerId); at(e); });
+  tl.addEventListener('pointermove', function(e){ if(dragging) at(e); });
+  tl.addEventListener('pointerup', function(){ dragging = false; });
+  tl.addEventListener('pointercancel', function(){ dragging = false; });
+})();
+
+/* ------------------------------- drawers ------------------------------ */
+function openScrim(id){ $(id).classList.add('show'); }
+function closeScrim(id){ $(id).classList.remove('show'); }
+['cueScrim', 'editScrim', 'syncScrim', 'gotoScrim', 'setScrim'].forEach(function(id){
+  $(id).addEventListener('click', function(e){ if(e.target === $(id)) closeScrim(id); });
+});
+$('cueClose').onclick = function(){ closeScrim('cueScrim'); };
+$('editClose').onclick = function(){ closeScrim('editScrim'); };
+$('syncClose').onclick = function(){ closeScrim('syncScrim'); };
+$('gotoClose').onclick = function(){ closeScrim('gotoScrim'); };
+$('setClose').onclick = function(){ closeScrim('setScrim'); };
+
+/* ------------------------------ cue sheet ----------------------------- */
+function renderCueList(){
+  var box = $('cueList');
+  box.innerHTML = '';
+  var anyEst = false;
+  CUES.forEach(function(c){
+    if(c.est) anyEst = true;
+    var row = el('div', 'cueRow' + (c.est ? ' est' : ''));
+    row.appendChild(el('div', 'ct', fmtTC(c.t)));
+    var mid = el('div', 'cn');
+    var head = el('div');
+    head.appendChild(el('i', 'kind k-' + c.kind));
+    head.appendChild(document.createTextNode(' ' + c.title));
+    if(c.sync) head.appendChild(el('span', null, '  ⌖'));
+    if(c.bpm) head.appendChild(el('span', null, '  ♩' + c.bpm));
+    mid.appendChild(head);
+    if(c.note) mid.appendChild(el('small', null, c.note));
+    row.appendChild(mid);
+    var btns = el('div', 'cbtns');
+    var bStamp = el('button', 'mini stamp', 'STAMP');
+    bStamp.onclick = function(e){
+      e.stopPropagation();
+      c.t = Math.round(filmTime() * 10) / 10;
+      c.est = false;
+      sortCues(); save(); renderCueList(); drawTimeline(); renderOrder(); refreshChips();
+      toast('Stamped at ' + fmtTC(c.t, true), 'good');
+    };
+    var bGo = el('button', 'mini go', 'GO');
+    bGo.onclick = function(e){ e.stopPropagation(); closeScrim('cueScrim'); gotoCue(c, true); };
+    var bEd = el('button', 'mini', 'EDIT');
+    bEd.onclick = function(e){ e.stopPropagation(); openEdit(c); };
+    btns.appendChild(bStamp); btns.appendChild(bGo); btns.appendChild(bEd);
+    row.appendChild(btns);
+    box.appendChild(row);
+  });
+  $('estBanner').classList.toggle('hide', !anyEst);
+}
+$('btnCues').onclick = function(){ renderCueList(); openScrim('cueScrim'); };
+$('cueAdd').onclick = function(){
+  var c = normaliseCue({ t: Math.round(filmTime() * 10) / 10, kind: 'song', title: 'New cue', est: false });
+  CUES.push(c); sortCues(); save(); renderCueList(); drawTimeline(); renderOrder();
+  openEdit(c);
+};
+$('cueStampNext').onclick = function(){
+  var nx = cuesAfter(filmTime(), 1)[0];
+  if(!nx){ toast('Nothing left to stamp', 'warn'); return; }
+  nx.t = Math.round(filmTime() * 10) / 10;
+  nx.est = false;
+  sortCues(); save(); renderCueList(); drawTimeline(); renderOrder(); refreshChips();
+  toast('“' + nx.title.slice(0, 28) + '” → ' + fmtTC(nx.t, true), 'good');
+};
+
+/* ------------------------------ cue editor ---------------------------- */
+var editing = null;
+function openEdit(c){
+  editing = c;
+  $('editHead').textContent = 'EDIT CUE';
+  $('eTitle').value = c.title;
+  $('eTime').value = fmtTC(c.t, true);
+  $('eNote').value = c.note;
+  $('eBpm').value = c.bpm || '';
+  $('eSig').value = c.sig || 4;
+  $('eBars').value = c.bars == null ? 1 : c.bars;
+  $('eLead').value = c.lead == null ? '' : c.lead;
+  $('eSync').checked = c.sync;
+  $('eEst').checked = c.est;
+  Array.prototype.forEach.call($('eKind').children, function(b){
+    b.classList.toggle('on', b.dataset.k === c.kind);
+  });
+  openScrim('editScrim');
+}
+Array.prototype.forEach.call($('eKind').children, function(b){
+  b.onclick = function(){
+    Array.prototype.forEach.call($('eKind').children, function(x){ x.classList.remove('on'); });
+    b.classList.add('on');
+  };
+});
+$('eStamp').onclick = function(){
+  $('eTime').value = fmtTC(filmTime(), true);
+  $('eEst').checked = false;
+};
+$('eSave').onclick = function(){
+  if(!editing) return;
+  var t = parseTC($('eTime').value);
+  if(t == null){ toast('Timecode not understood', 'warn'); return; }
+  editing.t = t;
+  editing.title = $('eTitle').value.trim() || 'Untitled';
+  editing.note = $('eNote').value.trim();
+  var bpm = parseFloat($('eBpm').value);
+  editing.bpm = isNaN(bpm) || bpm <= 0 ? null : bpm;
+  editing.sig = clamp(parseInt($('eSig').value, 10) || 4, 1, 16);
+  editing.bars = clamp(parseInt($('eBars').value, 10) || 0, 0, 8);
+  var ld = parseFloat($('eLead').value);
+  editing.lead = isNaN(ld) ? null : ld;
+  editing.sync = $('eSync').checked;
+  editing.est = $('eEst').checked;
+  var on = $('eKind').querySelector('.on');
+  editing.kind = on ? on.dataset.k : 'cue';
+  sortCues(); save(); renderCueList(); drawTimeline(); renderOrder(); refreshChips();
+  last.next = ''; last.now = ''; last.up = '';
+  closeScrim('editScrim');
+  toast('Saved', 'good');
+};
+$('eDelete').onclick = function(){
+  if(!editing) return;
+  if(!confirm('Delete “' + editing.title + '”?')) return;
+  CUES = CUES.filter(function(c){ return c !== editing; });
+  save(); renderCueList(); drawTimeline(); renderOrder(); refreshChips();
+  last.next = ''; last.now = ''; last.up = '';
+  closeScrim('editScrim');
+};
+
+/* -------------------------------- sync -------------------------------- */
+var lastSync = null;      /* {film, wall} of the previous SYNC tap */
+var measuredRate = null;  /* what the last two taps say the clock is doing */
+
+function syncTo(c){
+  var t = c.t - SET.latency / 1000;
+  var wall = nowSec();
+  var msg = 'Synced to ' + fmtTC(c.t) + ' — ' + c.title.slice(0, 26);
+
+  /* Two syncs far enough apart measure how fast our clock runs against the
+     print. A 23.976 vs 24 fps mismatch is ~9s adrift over the whole film, so
+     it is worth knowing about rather than nudging away all night. */
+  if(!T.hasVideo && lastSync && wall - lastSync.wall > 120){
+    var filmSpan = t - lastSync.film;
+    var wallSpan = wall - lastSync.wall;
+    var appliedSpan = wallSpan * SET.rate;
+    if(filmSpan > 60){
+      var r = SET.rate * (filmSpan / appliedSpan);
+      if(r > 0.9 && r < 1.1){
+        measuredRate = r;
+        var driftPerHour = (r - 1) * 3600;
+        msg += '  ·  drift ' + (driftPerHour >= 0 ? '+' : '') + driftPerHour.toFixed(1) + 's/hr';
+        syncSetupForm();
+      }
+    }
+  }
+  lastSync = { film: t, wall: wall };
+
+  setFilmTime(t);
+  if(!isRunning()) play();
+  closeScrim('syncScrim');
+  toast(msg, 'good');
+}
+function renderSyncList(){
+  var box = $('syncList');
+  box.innerHTML = '';
+  var t = filmTime();
+  var pts = CUES.filter(function(c){ return c.sync; })
+    .sort(function(a, b){ return Math.abs(a.t - t) - Math.abs(b.t - t); });
+  if(!pts.length){
+    box.appendChild(el('p', 'note', 'No cues are marked as sync points yet. Tick “usable as a sync point” on any cue with an unmistakable frame.'));
+    return;
+  }
+  pts.forEach(function(c){
+    var row = el('div', 'syncItem');
+    row.appendChild(el('span', 'st', fmtTC(c.t)));
+    var n = el('span', 'sn', c.title);
+    if(c.est) n.appendChild(el('small', null, ' (estimate)'));
+    row.appendChild(n);
+    var d = c.t - t;
+    row.appendChild(el('span', 'sd', (d >= 0 ? '+' : '') + fmtShort(d)));
+    row.addEventListener('click', function(){ syncTo(c); });
+    box.appendChild(row);
+  });
+}
+$('btnSync').onclick = function(){ renderSyncList(); openScrim('syncScrim'); };
+
+/* -------------------------------- go to ------------------------------- */
+function gotoCue(c, roll){
+  var pre = roll ? SET.preroll : 0;
+  var target = c.t - Math.max(pre, countInLen(c) + 3);
+  setFilmTime(Math.max(0, roll ? target : c.t));
+  closeScrim('gotoScrim');
+  if(!isRunning()) play();
+  toast('From ' + fmtTC(filmTime()) + ' → ' + c.title.slice(0, 26));
+}
+function openGoto(pref){
+  var box = $('gotoList');
+  box.innerHTML = '';
+  $('gotoTime').value = fmtTC(pref ? pref.t : filmTime());
+  CUES.forEach(function(c){
+    var row = el('div', 'syncItem');
+    row.appendChild(el('span', 'st', fmtTC(c.t)));
+    var n = el('span', 'sn', c.title);
+    row.appendChild(n);
+    row.appendChild(el('span', 'sd', c.kind.toUpperCase()));
+    row.addEventListener('click', function(){ gotoCue(c, $('gotoRoll').checked); });
+    box.appendChild(row);
+  });
+  openScrim('gotoScrim');
+  if(pref) setTimeout(function(){
+    var rows = box.children;
+    var idx = CUES.indexOf(pref);
+    if(rows[idx]) rows[idx].scrollIntoView({ block: 'center' });
+  }, 30);
+}
+$('btnGoto').onclick = function(){ openGoto(null); };
+$('gotoJump').onclick = function(){
+  var t = parseTC($('gotoTime').value);
+  if(t == null){ toast('Timecode not understood', 'warn'); return; }
+  setFilmTime(t);
+  closeScrim('gotoScrim');
+  if(!isRunning()) play();
+};
+
+/* ------------------------------ transport UI --------------------------- */
+$('btnPlay').onclick = toggle;
+Array.prototype.forEach.call(document.querySelectorAll('.nudge'), function(b){
+  b.onclick = function(){ nudge(parseFloat(b.dataset.nudge)); };
+});
+$('btnPrev').onclick = function(){
+  var t = filmTime() - 2, prev = null;
+  CUES.forEach(function(c){ if(c.t <= t) prev = c; });
+  if(prev) setFilmTime(prev.t - Math.max(SET.preroll, countInLen(prev) + 3));
+  else setFilmTime(0);
+  toast(prev ? 'Back to ' + prev.title.slice(0, 26) : 'Back to start');
+};
+$('btnNext').onclick = function(){
+  var nx = cuesAfter(filmTime(), 1)[0];
+  if(!nx){ toast('End of sheet', 'warn'); return; }
+  setFilmTime(nx.t - Math.max(SET.preroll, countInLen(nx) + 3));
+  toast('Up to ' + nx.title.slice(0, 26));
+};
+$('btnClick').onclick = function(){
+  var order = ['off', 'countin', 'always'];
+  SET.clickMode = order[(order.indexOf(SET.clickMode) + 1) % 3];
+  if(SET.clickMode !== 'off') unlockAudio();
+  save(); refreshChips(); syncSetupForm();
+  toast('Click: ' + SET.clickMode.toUpperCase());
+};
+
+/* -------------------------------- video -------------------------------- */
+var vidURL = null;
+$('videoFile').addEventListener('change', function(e){
+  var f = e.target.files && e.target.files[0];
+  if(!f) return;
+  if(vidURL) URL.revokeObjectURL(vidURL);
+  vidURL = URL.createObjectURL(f);
+  vid.src = vidURL;
+  T.hasVideo = true;
+  SET.lastVideoName = f.name;
+  save();
+  $('vidName').textContent = f.name;
+  setVidSize(SET.vidSize || 'docked');
+  refreshChips();
+  reflectRunning();
+  toast('Film loaded — the video is now the clock', 'good');
+});
+vid.addEventListener('loadedmetadata', function(){
+  if(vid.duration && isFinite(vid.duration)){
+    var d = Math.round(vid.duration + SET.vidOffset);
+    if(Math.abs(d - SET.dur) > 60){
+      SET.dur = d; save(); drawTimeline(); syncSetupForm();
+      toast('Film length set from the file: ' + fmtTC(d));
+    }
+  }
+});
+$('btnFilm').onclick = function(){
+  if(!T.hasVideo){ openScrim('setScrim'); $('videoFile').click(); return; }
+  $('vidWrap').classList.toggle('hidden');
+  updateSlot();
+};
+$('vidHide').onclick = function(){ $('vidWrap').classList.add('hidden'); updateSlot(); };
+function setVidSize(size){
+  var w = $('vidWrap');
+  w.classList.remove('big', 'huge', 'docked');
+  w.classList.remove('hidden');
+  if(size === 'docked'){
+    if(w.parentNode !== $('filmSlot')) $('filmSlot').appendChild(w);
+    w.classList.add('docked');
+    w.style.left = w.style.top = w.style.right = w.style.bottom = '';
+  }else{
+    if(w.parentNode !== document.body) document.body.appendChild(w);
+    if(size === 'huge') w.classList.add('huge');
+  }
+  SET.vidSize = size;
+  save();
+  updateSlot();
+}
+Array.prototype.forEach.call(document.querySelectorAll('[data-vsize]'), function(b){
+  b.onclick = function(){ setVidSize(b.dataset.vsize); };
+});
+/* drag the film window by its bar */
+(function(){
+  var w = $('vidWrap'), bar = $('vidBar'), drag = null;
+  bar.addEventListener('pointerdown', function(e){
+    if(e.target.tagName === 'BUTTON') return;
+    if(w.classList.contains('huge')) return;
+    var r = w.getBoundingClientRect();
+    drag = { dx: e.clientX - r.left, dy: e.clientY - r.top, w: r.width, h: r.height };
+    bar.setPointerCapture(e.pointerId);
+  });
+  bar.addEventListener('pointermove', function(e){
+    if(!drag) return;
+    var x = clamp(e.clientX - drag.dx, 0, innerWidth - drag.w);
+    var y = clamp(e.clientY - drag.dy, 0, innerHeight - drag.h);
+    w.style.left = x + 'px'; w.style.top = y + 'px';
+    w.style.right = 'auto'; w.style.bottom = 'auto';
+  });
+  bar.addEventListener('pointerup', function(){ drag = null; });
+})();
+
+/* ------------------------------- setup UI ------------------------------ */
+function syncSetupForm(){
+  $('setDur').value = fmtTC(SET.dur);
+  $('setLead').value = SET.lead;
+  $('setLatency').value = SET.latency;
+  $('setVol').value = SET.vol;
+  $('setWake').checked = SET.wake;
+  $('setFlash').checked = SET.flash;
+  $('setShow').value = SET.show;
+  $('setVidOffset').value = SET.vidOffset;
+  $('setRate').value = SET.rate.toFixed(4);
+  $('setRateAuto').textContent = measuredRate ? 'USE ' + measuredRate.toFixed(4) : 'USE MEASURED';
+  Array.prototype.forEach.call($('setClickMode').children, function(b){
+    b.classList.toggle('on', b.dataset.c === SET.clickMode);
+  });
+  $('verNote').textContent = 'Metropolis Live Cue v' + VERSION +
+    ' · ' + CUES.length + ' cues · everything is stored on this device only.';
+}
+$('btnSet').onclick = function(){ syncSetupForm(); openScrim('setScrim'); };
+$('setDur').onchange = function(){
+  var d = parseTC(this.value);
+  if(d && d > 60){ SET.dur = d; save(); drawTimeline(); }
+  syncSetupForm();
+};
+$('setLead').onchange = function(){ SET.lead = clamp(parseFloat(this.value) || 60, 1, 900); save(); last.next = ''; };
+$('setLatency').onchange = function(){ SET.latency = clamp(parseFloat(this.value) || 0, 0, 1000); save(); };
+$('setRate').onchange = function(){
+  var f = filmTime();
+  SET.rate = clamp(parseFloat(this.value) || 1, 0.9, 1.1);
+  T.anchorFilm = f; T.anchorWall = nowSec();
+  save(); refreshChips(); syncSetupForm();
+};
+$('setRateAuto').onclick = function(){
+  if(!measuredRate){ toast('Sync twice, 2 minutes apart, to measure it', 'warn'); return; }
+  var f = filmTime();
+  SET.rate = clamp(measuredRate, 0.9, 1.1);
+  T.anchorFilm = f; T.anchorWall = nowSec();
+  save(); refreshChips(); syncSetupForm();
+  toast('Clock rate set to ' + SET.rate.toFixed(4), 'good');
+};
+$('setVidOffset').onchange = function(){ SET.vidOffset = parseFloat(this.value) || 0; save(); refreshChips(); };
+$('setVol').oninput = function(){ SET.vol = parseFloat(this.value); save(); };
+$('setWake').onchange = function(){ SET.wake = this.checked; save(); this.checked ? requestWake() : releaseWake(); refreshChips(); };
+$('setFlash').onchange = function(){ SET.flash = this.checked; save(); };
+$('setShow').onchange = function(){ SET.show = this.value; save(); };
+$('setTestClick').onclick = function(){ unlockAudio(); if(actx){ blip(actx.currentTime + 0.02, true); blip(actx.currentTime + 0.3, false); } };
+Array.prototype.forEach.call($('setClickMode').children, function(b){
+  b.onclick = function(){ SET.clickMode = b.dataset.c; if(SET.clickMode !== 'off') unlockAudio(); save(); syncSetupForm(); refreshChips(); };
+});
+$('setWipe').onclick = function(){
+  if(!confirm('Wipe the cue sheet and settings on this device and go back to the seed sheet?')) return;
+  localStorage.removeItem(STORE_KEY);
+  location.reload();
+};
+
+/* ---------------------------- import / export -------------------------- */
+function download(name, obj){
+  var blob = new Blob([JSON.stringify(obj, null, 2)], { type: 'application/json' });
+  var a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = name;
+  document.body.appendChild(a); a.click();
+  setTimeout(function(){ URL.revokeObjectURL(a.href); a.remove(); }, 1000);
+}
+function exportAll(){
+  download('metropolis-cues-' + new Date().toISOString().slice(0, 10) + '.json',
+    { app: 'metropolis-live-cue', v: VERSION, set: SET, cues: CUES });
+  toast('Exported', 'good');
+}
+$('cueExport').onclick = exportAll;
+$('setExportAll').onclick = exportAll;
+$('cueImport').onclick = function(){ $('importFile').click(); };
+$('importFile').addEventListener('change', function(e){
+  var f = e.target.files && e.target.files[0];
+  if(!f) return;
+  var r = new FileReader();
+  r.onload = function(){
+    try{
+      var d = JSON.parse(r.result);
+      if(!d || !Array.isArray(d.cues)) throw new Error('no cues');
+      CUES = d.cues.map(normaliseCue);
+      if(d.set) SET = Object.assign(defaultSettings(), d.set);
+      sortCues(); save(); renderCueList(); drawTimeline(); renderOrder(); syncSetupForm(); refreshChips();
+      last.next = ''; last.now = ''; last.up = '';
+      toast('Imported ' + CUES.length + ' cues', 'good');
+    }catch(err){ toast('That file did not read as a cue sheet', 'warn'); }
+  };
+  r.readAsText(f);
+  e.target.value = '';
+});
+$('cueReset').onclick = function(){
+  if(!confirm('Replace the current sheet with the seed sheet? Export first if you want to keep it.')) return;
+  CUES = seedCues(); save(); renderCueList(); drawTimeline(); renderOrder(); refreshChips();
+  last.next = ''; last.now = ''; last.up = '';
+};
+
+/* ------------------------- wake lock / fullscreen ---------------------- */
+var wl = null;
+function requestWake(){
+  if(!SET.wake || !navigator.wakeLock) { refreshChips(); return; }
+  navigator.wakeLock.request('screen').then(function(l){
+    wl = l;
+    l.addEventListener('release', function(){ wl = null; refreshChips(); });
+    refreshChips();
+  }).catch(function(){ refreshChips(); });
+}
+function releaseWake(){ if(wl){ wl.release(); wl = null; } refreshChips(); }
+document.addEventListener('visibilitychange', function(){
+  if(document.visibilityState === 'visible' && SET.wake && !wl) requestWake();
+});
+$('btnFull').onclick = function(){
+  var d = document.documentElement;
+  var isFs = document.fullscreenElement || document.webkitFullscreenElement;
+  if(isFs){
+    (document.exitFullscreen || document.webkitExitFullscreen).call(document);
+  }else{
+    var fn = d.requestFullscreen || d.webkitRequestFullscreen;
+    if(fn) fn.call(d);
+    else toast('Add to Home Screen for full screen on iPad', 'warn');
+  }
+};
+
+/* ------------------------------- chips --------------------------------- */
+function refreshChips(){
+  $('chipMode').textContent = T.hasVideo ? 'FILM CLOCK' : 'FREE RUN';
+  $('chipMode').className = 'chip ' + (T.hasVideo ? 'on' : 'live');
+  $('chipDrift').textContent = T.hasVideo
+    ? 'OFFSET ' + (SET.vidOffset >= 0 ? '+' : '') + SET.vidOffset.toFixed(2) + 's'
+    : 'SYNC BY HAND';
+  if(!T.hasVideo && Math.abs(SET.rate - 1) > 1e-6){
+    $('chipDrift').textContent = 'RATE ' + SET.rate.toFixed(4);
+    $('chipDrift').className = 'chip warn';
+  }else{
+    $('chipDrift').className = 'chip';
+  }
+  $('chipClick').textContent = 'CLICK ' + SET.clickMode.toUpperCase();
+  $('chipClick').className = 'chip' + (SET.clickMode === 'off' ? '' : ' on');
+  $('chipWake').textContent = wl ? 'SCREEN LOCKED ON' : 'SCREEN';
+  $('chipWake').className = 'chip' + (wl ? ' on' : '');
+  var anyEst = CUES.some(function(c){ return c.est; });
+  $('chipEst').classList.toggle('hide', !anyEst);
+  $('chipEst').textContent = CUES.filter(function(c){ return c.est; }).length + ' EST';
+  $('offsetVal').textContent = (SET.vidOffset >= 0 ? '+' : '') + SET.vidOffset.toFixed(2) + 's';
+  $('offsetLine').style.display = T.hasVideo ? '' : 'none';
+}
+
+/* ------------------------------ keyboard -------------------------------- */
+document.addEventListener('keydown', function(e){
+  if(/^(INPUT|TEXTAREA|SELECT)$/.test(e.target.tagName)) return;
+  var k = e.key.toLowerCase();
+  if(k === ' ' || k === 'spacebar'){ e.preventDefault(); toggle(); }
+  else if(k === 's'){ renderSyncList(); openScrim('syncScrim'); }
+  else if(k === 'c'){ $('btnClick').click(); }
+  else if(k === 'f'){ $('btnFull').click(); }
+  else if(k === 'e'){ renderCueList(); openScrim('cueScrim'); }
+  else if(k === 'g'){ openGoto(null); }
+  else if(k === 'arrowleft'){ e.preventDefault(); nudge(e.shiftKey ? -10 : -1); }
+  else if(k === 'arrowright'){ e.preventDefault(); nudge(e.shiftKey ? 10 : 1); }
+  else if(k === 'arrowdown'){ e.preventDefault(); nudge(-0.1); }
+  else if(k === 'arrowup'){ e.preventDefault(); nudge(0.1); }
+  else if(k === 'n'){ $('btnNext').click(); }
+  else if(k === 'p'){ $('btnPrev').click(); }
+  else if(k === 'escape'){ ['cueScrim','editScrim','syncScrim','gotoScrim','setScrim'].forEach(closeScrim); }
+});
+
+/* -------------------------------- boot ---------------------------------- */
+load();
+drawTimeline();
+renderOrder();
+updateSlot();
+syncSetupForm();
+refreshChips();
+reflectRunning();
+render();
+/* Safari will not start an AudioContext outside a gesture, so try on every tap. */
+document.addEventListener('pointerdown', function(){
+  if(SET.clickMode !== 'off') unlockAudio();
+});
+if(SET.lastVideoName) $('vidName').textContent = SET.lastVideoName + ' — re-pick in SETUP';
+
+if('serviceWorker' in navigator){
+  window.addEventListener('load', function(){
+    navigator.serviceWorker.register('sw.js').catch(function(){});
+  });
+}
+</script>
+</body>
+</html>
