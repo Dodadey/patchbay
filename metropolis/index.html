@@ -334,7 +334,7 @@ body.running .btn.play{background:var(--panel); border-color:var(--line2); color
   padding-top:var(--safe-t); padding-bottom:var(--safe-b);
 }
 .dhead{
-  display:flex; align-items:center; gap:10px; padding:12px 14px;
+  display:flex; align-items:center; gap:8px; padding:12px 14px; flex-wrap:wrap;
   border-bottom:1px solid var(--line); background:var(--panel);
 }
 .dhead h2{margin:0; font-size:15px; font-family:var(--mono); letter-spacing:.2em; color:var(--gold); flex:1;}
@@ -405,6 +405,53 @@ h3.sec:first-child{margin-top:0;}
 #toast.show{opacity:1;}
 #toast.good{color:var(--green); border-color:#26543c;}
 #toast.warn{color:var(--amber); border-color:var(--gold-dim);}
+
+/* song sheet (bulk text entry) */
+#songText{
+  width:100%; min-height:210px; font-family:var(--mono); font-size:14px; line-height:1.55;
+  white-space:pre; overflow-wrap:normal; overflow-x:auto;
+}
+.fmt{
+  font-family:var(--mono); font-size:12.5px; line-height:1.8; color:var(--dim);
+  background:var(--panel); border:1px solid var(--line); border-radius:9px;
+  padding:10px 12px; margin:8px 0 0; overflow-x:auto; white-space:pre;
+}
+.fmt b{color:var(--gold); font-weight:600;}
+.pvHead{
+  display:flex; align-items:baseline; gap:10px; margin:20px 0 8px;
+  font-family:var(--mono); font-size:11px; letter-spacing:.2em; color:var(--gold);
+}
+.pvHead span{margin-left:auto; letter-spacing:.06em; color:var(--faint);}
+.pvRow{
+  display:grid; grid-template-columns:80px 1fr 62px 46px 54px 78px; gap:8px; align-items:baseline;
+  padding:8px 10px; border:1px solid var(--line); border-radius:8px; margin-bottom:5px;
+  background:var(--panel); font-size:13.5px;
+}
+.pvRow.bad{border-color:#5c2419; background:#170b08;}
+.pvRow.guess{border-left:3px solid var(--amber);}
+.pvRow i{font-family:var(--mono); font-style:normal; font-size:12.5px; color:var(--gold); font-variant-numeric:tabular-nums;}
+.pvRow u{text-decoration:none; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;}
+.pvRow em{font-family:var(--mono); font-style:normal; font-size:12px; color:var(--dim); font-variant-numeric:tabular-nums;}
+.pvRow .err{grid-column:1 / -1; color:var(--red); font-size:12.5px; font-family:var(--mono);}
+.pvRow.head{background:transparent; border:0; padding:2px 10px; margin-bottom:2px;}
+.pvRow.head span{font-family:var(--mono); font-size:10px; letter-spacing:.14em; color:var(--faint);}
+
+details#songHelp{
+  margin-top:22px; border:1px solid var(--line); border-radius:9px; background:var(--panel);
+}
+details#songHelp summary{
+  cursor:pointer; padding:11px 13px; font-family:var(--mono); font-size:11px;
+  letter-spacing:.18em; color:var(--gold); list-style:none;
+}
+details#songHelp summary::-webkit-details-marker{display:none;}
+details#songHelp summary::after{content:"  +"; color:var(--faint);}
+details#songHelp[open] summary::after{content:"  −";}
+details#songHelp .note{padding:0 13px 4px;}
+details#songHelp .note:last-child{padding-bottom:12px;}
+code{
+  font-family:var(--mono); font-size:.92em; background:var(--raised);
+  border:1px solid var(--line2); border-radius:4px; padding:1px 5px; color:var(--ink);
+}
 
 /* sync picker */
 .syncItem{
@@ -529,6 +576,7 @@ h3.sec:first-child{margin-top:0;}
       <h2>CUE SHEET</h2>
       <button class="tbtn" id="cueAdd">+ ADD</button>
       <button class="tbtn" id="cueStampNext">STAMP NEXT</button>
+      <button class="tbtn" id="cueSongs">SONG SHEET</button>
       <button class="tbtn" id="cueClose">CLOSE</button>
     </div>
     <div class="dbody">
@@ -592,7 +640,9 @@ h3.sec:first-child{margin-top:0;}
         <input type="number" id="eBpm" min="20" max="300" step="0.5" placeholder="—">
         <span style="font-family:var(--mono);font-size:12px;color:var(--faint)">BPM</span>
         <input type="number" id="eSig" min="1" max="16" step="1" placeholder="4" style="flex:0 0 76px">
-        <span style="font-family:var(--mono);font-size:12px;color:var(--faint)">BEATS / BAR</span>
+        <span style="font-family:var(--mono);font-size:14px;color:var(--faint)">/</span>
+        <input type="number" id="eSigD" min="1" max="32" step="1" placeholder="4" style="flex:0 0 76px">
+        <span style="font-family:var(--mono);font-size:12px;color:var(--faint)">TIME SIGNATURE</span>
       </div>
       <div class="frow">
         <label>COUNT-IN BARS</label>
@@ -619,6 +669,63 @@ h3.sec:first-child{margin-top:0;}
     <div class="dfoot">
       <button class="btn wide" id="eSave" style="background:var(--gold);border-color:var(--gold);color:#140d02;font-weight:700">SAVE</button>
       <button class="btn" id="eDelete" style="color:var(--red);border-color:#5c2419">DELETE</button>
+    </div>
+  </div>
+</div>
+
+<!-- SONG SHEET: type or paste the whole set at once -->
+<div class="scrim" id="songScrim">
+  <div class="drawer">
+    <div class="dhead">
+      <h2>SONG SHEET</h2>
+      <button class="tbtn" id="songLoad">LOAD CURRENT</button>
+      <button class="tbtn" id="songClose">CLOSE</button>
+    </div>
+    <div class="dbody">
+      <p class="note" style="font-size:13.5px;margin-top:0">
+        One song per line, in this order. Only the title is compulsory.
+      </p>
+      <div class="fmt"><b>time , title , tempo , beats-per-bar , count-in bars , note</b></div>
+      <textarea id="songText" spellcheck="false" autocapitalize="off" autocorrect="off"
+        placeholder="1:02:33 , Moloch , 96 , 4/4 , 2 , comes in on the explosion
+0:38:00 , Babel , 72 , 3/4 , 1
+? , Yoshiwara , 118 , 6/8 , 2 , don't know the timecode yet"></textarea>
+      <div class="pvHead">PREVIEW <span id="pvCount">nothing yet</span></div>
+      <div id="songPreview"></div>
+
+      <details id="songHelp">
+        <summary>How the app reads these lines</summary>
+        <p class="note">
+          Type them here, or paste a column straight out of Numbers, Excel or a notes app.
+          Tabs, commas, vertical bars and runs of spaces all work as separators, so you rarely
+          have to think about it &mdash; and the preview shows exactly what the app made of
+          each line before you commit anything.
+        </p>
+        <p class="note">
+          Leave the <b>tempo</b> out and the song simply gets no count-in. Leave
+          <b>beats-per-bar</b> out and it assumes 4; leave <b>count-in bars</b> out and it
+          assumes 1. Write the tempo however you like &mdash; <code>96</code>, <code>96bpm</code>
+          and <code>&#9833;=96</code> all read the same. Write the signature as <code>6/8</code>,
+          <code>3/4</code> or just <code>6</code>; the top number is what gets counted.
+          A line starting with <code>#</code> is ignored, so you can leave yourself notes.
+        </p>
+        <p class="note">
+          <b>Don't know the timecodes yet?</b> Put <code>?</code> in the time column, or leave it
+          out entirely. The songs get parked in the order you typed them, spread across the film
+          and flagged as estimates &mdash; then play the film through, open CUES and hit
+          <b>STAMP NEXT</b> as each one arrives to pin down the real timecode.
+        </p>
+        <p class="note">
+          <b>LOAD CURRENT</b> fills the box with the songs already in the sheet, in this same
+          format, so you can edit the lot as text and put it back with REPLACE ALL SONGS.
+          Scenes and act markers are never touched by either button.
+        </p>
+      </details>
+    </div>
+    <div class="dfoot">
+      <button class="btn wide" id="songReplace"
+        style="background:var(--gold);border-color:var(--gold);color:#140d02;font-weight:700">REPLACE ALL SONGS</button>
+      <button class="btn" id="songAppend">ADD TO SHEET</button>
     </div>
   </div>
 </div>
@@ -887,19 +994,19 @@ function seedCues(){
   var cues = raw.map(function(r){
     return {
       id: uid(), t: r[0], kind: r[1], title: r[2], note: r[3] || '',
-      sync: !!r[4], est: true, bpm: null, sig: 4, bars: 1, lead: null
+      sync: !!r[4], est: true, bpm: null, sig: 4, sigd: 4, bars: 1, lead: null
     };
   });
   /* Two worked examples so the count-in is visible on first run. Delete them. */
   cues.push({
     id: uid(), t: 600, kind: 'song', title: 'EXAMPLE — "Moloch" (delete me)',
     note: 'Example song cue. It shows how a tempo turns into a full-screen count-in: two bars of 4 at 96bpm land the downbeat on the explosion.',
-    sync: false, est: true, bpm: 96, sig: 4, bars: 2, lead: 90
+    sync: false, est: true, bpm: 96, sig: 4, sigd: 4, bars: 2, lead: 90
   });
   cues.push({
     id: uid(), t: 7080, kind: 'song', title: 'EXAMPLE — "Heart Machine" (delete me)',
     note: 'Example song cue in 6/8 at 132. Delete both examples once your own sheet is in.',
-    sync: false, est: true, bpm: 132, sig: 6, bars: 1, lead: 120
+    sync: false, est: true, bpm: 132, sig: 6, sigd: 8, bars: 1, lead: 120
   });
   cues.sort(function(a, b){ return a.t - b.t; });
   return cues;
@@ -954,6 +1061,7 @@ function normaliseCue(c){
     est: !!c.est,
     bpm: c.bpm ? Number(c.bpm) : null,
     sig: Number(c.sig) || 4,
+    sigd: Number(c.sigd) || 4,
     bars: c.bars == null ? 1 : Number(c.bars),
     lead: c.lead == null || c.lead === '' ? null : Number(c.lead)
   };
@@ -1034,6 +1142,7 @@ vid.addEventListener('pause', reflectRunning);
 
 /* -------------------------- cue interrogation ------------------------- */
 function leadOf(c){ return c.lead == null ? SET.lead : c.lead; }
+function sigLabel(c){ return (c.sig || 4) + '/' + (c.sigd || 4); }
 function beatDur(c){ return 60 / c.bpm; }
 function countInLen(c){
   if(!c.bpm || !c.bars) return 0;
@@ -1197,7 +1306,7 @@ function render(){
       ui.nextNote.textContent = nx.note;
       ui.nextNote.style.display = nx.note ? '' : 'none';
       var meta = 'AT ' + fmtTC(nx.t) + '  ·  ' + nx.kind.toUpperCase();
-      if(nx.bpm) meta += '  ·  ♩=' + nx.bpm + ' · ' + (nx.bars || 0) + ' BAR IN';
+      if(nx.bpm) meta += '  ·  ♩=' + nx.bpm + ' ' + sigLabel(nx) + ' · ' + (nx.bars || 0) + ' BAR IN';
       if(nx.est) meta += '  ·  ESTIMATE';
       ui.nextMeta.textContent = meta;
     }
@@ -1284,9 +1393,13 @@ function renderOrder(){
   box.innerHTML = '';
   var songs = CUES.filter(function(c){ return c.kind === 'song'; });
   if(!songs.length){
-    box.appendChild(el('div', 'empty',
-      'No cues are marked SONG yet. Set a cue’s kind to SONG and it shows up here as your running order — ' +
-      'give it a tempo and it gets a count-in too.'));
+    var empty = el('div', 'empty');
+    empty.appendChild(document.createTextNode('No songs in the sheet yet. '));
+    var link = el('button', 'mini stamp', 'OPEN THE SONG SHEET');
+    link.onclick = function(){ openSongs(); };
+    empty.appendChild(link);
+    empty.appendChild(document.createTextNode(' to type or paste the whole set in one go.'));
+    box.appendChild(empty);
     return;
   }
   songs.forEach(function(c){
@@ -1295,7 +1408,7 @@ function renderOrder(){
     li.dataset.t = c.t;
     li.appendChild(el('span', 'ot', fmtTC(c.t)));
     li.appendChild(el('span', 'on', c.title));
-    li.appendChild(el('span', 'ob', c.bpm ? '♩' + c.bpm + ' · ' + (c.sig || 4) + '/4' : '—'));
+    li.appendChild(el('span', 'ob', c.bpm ? '♩' + c.bpm + ' · ' + sigLabel(c) : '—'));
     li.addEventListener('click', function(){ gotoCue(c, true); });
     box.appendChild(li);
   });
@@ -1353,7 +1466,7 @@ function drawTimeline(){
 /* ------------------------------- drawers ------------------------------ */
 function openScrim(id){ $(id).classList.add('show'); }
 function closeScrim(id){ $(id).classList.remove('show'); }
-['cueScrim', 'editScrim', 'syncScrim', 'gotoScrim', 'setScrim'].forEach(function(id){
+['cueScrim', 'editScrim', 'songScrim', 'syncScrim', 'gotoScrim', 'setScrim'].forEach(function(id){
   $(id).addEventListener('click', function(e){ if(e.target === $(id)) closeScrim(id); });
 });
 $('cueClose').onclick = function(){ closeScrim('cueScrim'); };
@@ -1376,7 +1489,7 @@ function renderCueList(){
     head.appendChild(el('i', 'kind k-' + c.kind));
     head.appendChild(document.createTextNode(' ' + c.title));
     if(c.sync) head.appendChild(el('span', null, '  ⌖'));
-    if(c.bpm) head.appendChild(el('span', null, '  ♩' + c.bpm));
+    if(c.bpm) head.appendChild(el('span', null, '  ♩' + c.bpm + ' ' + sigLabel(c)));
     mid.appendChild(head);
     if(c.note) mid.appendChild(el('small', null, c.note));
     row.appendChild(mid);
@@ -1424,6 +1537,7 @@ function openEdit(c){
   $('eNote').value = c.note;
   $('eBpm').value = c.bpm || '';
   $('eSig').value = c.sig || 4;
+  $('eSigD').value = c.sigd || 4;
   $('eBars').value = c.bars == null ? 1 : c.bars;
   $('eLead').value = c.lead == null ? '' : c.lead;
   $('eSync').checked = c.sync;
@@ -1453,6 +1567,7 @@ $('eSave').onclick = function(){
   var bpm = parseFloat($('eBpm').value);
   editing.bpm = isNaN(bpm) || bpm <= 0 ? null : bpm;
   editing.sig = clamp(parseInt($('eSig').value, 10) || 4, 1, 16);
+  editing.sigd = clamp(parseInt($('eSigD').value, 10) || 4, 1, 32);
   editing.bars = clamp(parseInt($('eBars').value, 10) || 0, 0, 8);
   var ld = parseFloat($('eLead').value);
   editing.lead = isNaN(ld) ? null : ld;
@@ -1473,6 +1588,183 @@ $('eDelete').onclick = function(){
   last.next = ''; last.now = ''; last.up = '';
   closeScrim('editScrim');
 };
+
+/* ---------------------- song sheet: bulk text entry --------------------
+   One song per line. The separator is whatever the line actually uses, so a
+   paste out of a spreadsheet (tabs) and something typed on the iPad (commas)
+   both land the same way.
+---------------------------------------------------------------------- */
+function splitFields(line){
+  if(line.indexOf('\t') >= 0) return line.split('\t');
+  if(line.indexOf('|') >= 0) return line.split('|');
+  if(line.indexOf(',') >= 0) return line.split(',');
+  return line.split(/\s{2,}/);
+}
+function parseSongLine(line){
+  var f = splitFields(line).map(function(x){ return x.trim(); });
+  var out = { raw: line, err: null, t: null, title: '', bpm: null, sig: 4, sigd: 4, bars: 1, note: '' };
+
+  /* the time column is optional, and may be a placeholder */
+  var timeTok = f.shift() || '';
+  if(!/^(\?+|-+|–|—|tbd|tba|x)?$/i.test(timeTok)){
+    var tv = parseTC(timeTok);
+    if(tv == null) f.unshift(timeTok);   /* not a time — it must be the title */
+    else out.t = tv;
+  }
+
+  out.title = (f.shift() || '').trim();
+  if(!out.title){ out.err = 'no song title on this line'; return out; }
+
+  var bpmTok = (f.shift() || '').replace(/[^0-9.]/g, '');
+  if(bpmTok){
+    var bv = parseFloat(bpmTok);
+    if(isNaN(bv) || bv < 20 || bv > 300){ out.err = 'tempo “' + bpmTok + '” is not between 20 and 300'; return out; }
+    out.bpm = bv;
+  }
+
+  var sigTok = (f.shift() || '').trim();
+  if(sigTok){
+    var m = sigTok.match(/^(\d{1,2})\s*\/\s*(\d{1,2})$/) || sigTok.match(/^(\d{1,2})$/);
+    if(!m){ out.err = '“' + sigTok + '” is not a time signature — try 4/4, 6/8 or just 4'; return out; }
+    out.sig = clamp(parseInt(m[1], 10), 1, 16);
+    if(m[2]) out.sigd = clamp(parseInt(m[2], 10), 1, 32);
+  }
+
+  var barTok = (f.shift() || '').replace(/[^0-9]/g, '');
+  if(barTok) out.bars = clamp(parseInt(barTok, 10), 0, 8);
+
+  out.note = f.filter(function(x){ return x !== ''; }).join(', ').trim();
+  return out;
+}
+function parseSongText(text){
+  return String(text || '').split(/\r?\n/)
+    .map(function(l){ return l.trim(); })
+    .filter(function(l){ return l && l[0] !== '#'; })
+    .map(parseSongLine);
+}
+/* Songs with no timecode keep their typed order and get spread across the
+   film as estimates, so STAMP NEXT can walk down them during a play-through. */
+function placeSongs(rows){
+  var n = rows.length, dur = Math.max(SET.dur, 600), i, k;
+  if(!n) return rows;
+  var known = [];
+  for(i = 0; i < n; i++) if(rows[i].t != null) known.push(i);
+
+  if(!known.length){
+    for(i = 0; i < n; i++){
+      rows[i].t = dur * (0.05 + 0.9 * (n === 1 ? 0.5 : i / (n - 1)));
+      rows[i].guess = true;
+    }
+    return rows;
+  }
+  var first = known[0];
+  for(i = 0; i < first; i++){
+    rows[i].t = rows[first].t * ((i + 1) / (first + 1));
+    rows[i].guess = true;
+  }
+  for(k = 0; k + 1 < known.length; k++){
+    var a = known[k], b = known[k + 1];
+    for(i = a + 1; i < b; i++){
+      rows[i].t = rows[a].t + (rows[b].t - rows[a].t) * ((i - a) / (b - a));
+      rows[i].guess = true;
+    }
+  }
+  var lastK = known[known.length - 1], tail = n - 1 - lastK;
+  var room = Math.max(dur - rows[lastK].t, 60);
+  for(i = lastK + 1; i < n; i++){
+    rows[i].t = rows[lastK].t + room * ((i - lastK) / (tail + 1));
+    rows[i].guess = true;
+  }
+  return rows;
+}
+function songsToText(){
+  return CUES.filter(function(c){ return c.kind === 'song'; }).map(function(c){
+    var f = [fmtTC(c.t), c.title, c.bpm || '', sigLabel(c), c.bars == null ? 1 : c.bars, c.note || ''];
+    while(f.length && f[f.length - 1] === '') f.pop();
+    return f.join(' , ');
+  }).join('\n');
+}
+function renderSongPreview(){
+  var rows = parseSongText($('songText').value);
+  var box = $('songPreview');
+  box.innerHTML = '';
+  var good = rows.filter(function(r){ return !r.err; });
+  placeSongs(good);
+
+  if(!rows.length){
+    $('pvCount').textContent = 'nothing yet';
+    box.appendChild(el('p', 'note', 'Type or paste a line above and it shows up here.'));
+    return;
+  }
+  var bad = rows.length - good.length;
+  $('pvCount').textContent = good.length + ' song' + (good.length === 1 ? '' : 's') +
+    (bad ? '  ·  ' + bad + ' line' + (bad === 1 ? '' : 's') + ' the app could not read' : '');
+
+  var head = el('div', 'pvRow head');
+  ['TIME', 'TITLE', 'TEMPO', 'SIG', 'BARS', 'COUNT-IN'].forEach(function(h){
+    head.appendChild(el('span', null, h));
+  });
+  box.appendChild(head);
+
+  rows.forEach(function(r){
+    var row = el('div', 'pvRow' + (r.err ? ' bad' : (r.guess ? ' guess' : '')));
+    if(r.err){
+      row.appendChild(el('i', null, '—'));
+      row.appendChild(el('u', null, r.raw));
+      row.appendChild(el('em', null, ''));
+      row.appendChild(el('em', null, ''));
+      row.appendChild(el('em', null, ''));
+      row.appendChild(el('em', null, ''));
+      row.appendChild(el('span', 'err', '↳ ' + r.err));
+    }else{
+      row.appendChild(el('i', null, fmtTC(r.t) + (r.guess ? '?' : '')));
+      row.appendChild(el('u', null, r.title));
+      row.appendChild(el('em', null, r.bpm ? '♩' + r.bpm : '—'));
+      row.appendChild(el('em', null, r.sig + '/' + r.sigd));
+      row.appendChild(el('em', null, r.bpm ? r.bars + '' : '—'));
+      var len = r.bpm ? (r.bars * r.sig * (60 / r.bpm)) : 0;
+      row.appendChild(el('em', null, len ? len.toFixed(1) + 's' : 'none'));
+    }
+    box.appendChild(row);
+  });
+}
+function applySongs(replace){
+  var rows = parseSongText($('songText').value);
+  var good = rows.filter(function(r){ return !r.err; });
+  var bad = rows.length - good.length;
+  if(!good.length){ toast('No readable songs in the box', 'warn'); return; }
+  if(bad && !confirm(bad + ' line' + (bad === 1 ? '' : 's') +
+    ' could not be read and will be skipped. Add the other ' + good.length + '?')) return;
+
+  placeSongs(good);
+  if(replace){
+    var existing = CUES.filter(function(c){ return c.kind === 'song'; }).length;
+    if(existing && !confirm('Replace the ' + existing + ' song cue' + (existing === 1 ? '' : 's') +
+      ' already in the sheet with these ' + good.length + '? Scenes and act markers are left alone.')) return;
+    CUES = CUES.filter(function(c){ return c.kind !== 'song'; });
+  }
+  good.forEach(function(r){
+    CUES.push(normaliseCue({
+      t: Math.round(r.t * 10) / 10, kind: 'song', title: r.title, note: r.note,
+      bpm: r.bpm, sig: r.sig, sigd: r.sigd, bars: r.bars, est: !!r.guess, sync: false
+    }));
+  });
+  sortCues(); save(); renderCueList(); drawTimeline(); renderOrder(); refreshChips();
+  last.next = ''; last.now = ''; last.up = '';
+  closeScrim('songScrim');
+  toast(good.length + ' song' + (good.length === 1 ? '' : 's') + (replace ? ' set' : ' added'), 'good');
+}
+function openSongs(){
+  $('songText').value = songsToText();
+  renderSongPreview();
+  openScrim('songScrim');
+}
+$('cueSongs').onclick = openSongs;
+$('songClose').onclick = function(){ closeScrim('songScrim'); };
+$('songLoad').onclick = function(){ $('songText').value = songsToText(); renderSongPreview(); };
+$('songText').addEventListener('input', renderSongPreview);
+$('songReplace').onclick = function(){ applySongs(true); };
+$('songAppend').onclick = function(){ applySongs(false); };
 
 /* -------------------------------- sync -------------------------------- */
 var lastSync = null;      /* {film, wall} of the previous SYNC tap */
@@ -1828,7 +2120,7 @@ document.addEventListener('keydown', function(e){
   else if(k === 'arrowup'){ e.preventDefault(); nudge(0.1); }
   else if(k === 'n'){ $('btnNext').click(); }
   else if(k === 'p'){ $('btnPrev').click(); }
-  else if(k === 'escape'){ ['cueScrim','editScrim','syncScrim','gotoScrim','setScrim'].forEach(closeScrim); }
+  else if(k === 'escape'){ ['cueScrim','editScrim','songScrim','syncScrim','gotoScrim','setScrim'].forEach(closeScrim); }
 });
 
 /* -------------------------------- boot ---------------------------------- */

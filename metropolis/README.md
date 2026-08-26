@@ -83,7 +83,7 @@ so you know it is on. Free run only — the film clock cannot drift from itself.
 | **Kind** | `SONG` (also builds the running order) · `CUE` · `SCENE` · `ACT` |
 | **Heads-up** | What is about to happen and what you do about it |
 | **Lead time** | How early it takes over the NEXT panel. Blank = the global default |
-| **Tempo / beats per bar / count-in bars** | Turns the cue into a count-in |
+| **Tempo / time signature / count-in bars** | Turns the cue into a count-in |
 | **Sync point** | Puts it in the SYNC list |
 
 ### Count-ins
@@ -98,6 +98,36 @@ clicks only the bars before the downbeat; through mode keeps going for the
 length of the cue. Level is in SETUP. It is a rehearsal guide, on the iPad
 speaker or whatever it is plugged into — not a click track worth putting in
 anyone's ears at a show.
+
+### Entering the whole set at once
+
+**CUES → SONG SHEET** is the fast way in. One song per line:
+
+    time , title , tempo , beats-per-bar , count-in bars , note
+
+    1:02:33 , Moloch , 96 , 4/4 , 2 , comes in on the explosion
+    0:38:00 , Babel , 72 , 3/4 , 1
+    ? , Yoshiwara , 118 , 6/8 , 2 , dance sequence
+
+Only the **title** is compulsory. No tempo means no count-in; no beats-per-bar
+assumes 4; no count-in bars assumes 1. Tempos read the same written `96`,
+`96bpm` or `♩=96`. Signatures can be `6/8`, `3/4` or just `6` — the top number
+is what gets counted. Lines starting with `#` are ignored.
+
+Separators are whatever the line happens to use — tabs, commas, vertical bars,
+or runs of spaces — so a column pasted out of Numbers or Excel lands the same
+way as something typed on the iPad. The preview underneath shows what the app
+made of every line, with anything it could not read called out in red, before
+you commit.
+
+**Don't know the timecodes yet?** Put `?` in the time column or leave it out.
+Those songs keep the order you typed them, get spread across the film, and are
+flagged as estimates — then pin them down with a play-through as below.
+
+**REPLACE ALL SONGS** swaps the whole set for what is in the box; **ADD TO
+SHEET** appends. Neither touches scene or act markers. **LOAD CURRENT** fills
+the box with the songs already in the sheet in this same format, so you can
+edit the lot as text and put it back.
 
 ### Building the real sheet
 
