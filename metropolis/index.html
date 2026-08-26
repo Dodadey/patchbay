@@ -670,10 +670,10 @@ code{
       </div>
       <div class="frow">
         <label>COUNT-IN BARS</label>
-        <input type="number" id="eBars" min="0" max="8" step="1" placeholder="1">
+        <input type="number" id="eBars" min="0" max="8" step="1" placeholder="2">
         <span class="hint">Leave tempo blank for cues that need no count-in. With a tempo set, the
           full-screen count-in takes over that many bars before the downbeat, and a bar|beat readout
-          keeps running once the song is under way.</span>
+          keeps running once the song is under way. Two bars is the house default.</span>
       </div>
 
       <h3 class="sec">SYNC</h3>
@@ -728,7 +728,7 @@ code{
         <p class="note">
           Leave the <b>tempo</b> out and the song simply gets no count-in. Leave
           <b>beats-per-bar</b> out and it assumes 4; leave <b>count-in bars</b> out and it
-          assumes 1. Write the tempo however you like &mdash; <code>96</code>, <code>96bpm</code>
+          assumes 2. Write the tempo however you like &mdash; <code>96</code>, <code>96bpm</code>
           and <code>&#9833;=96</code> all read the same. Write the signature as <code>6/8</code>,
           <code>3/4</code> or just <code>6</code>; the top number is what gets counted.
           A line starting with <code>#</code> is ignored, so you can leave yourself notes.
@@ -1031,18 +1031,16 @@ function seedCues(){
   var cues = raw.map(function(r){
     return {
       id: uid(), t: r[0], kind: r[1], title: r[2], note: r[3] || '',
-      sync: !!r[4], est: true, bpm: null, sig: 4, sigd: 4, bars: 1, lead: null
+      sync: !!r[4], est: true, bpm: null, sig: 4, sigd: 4, bars: 2, lead: null
     };
   });
   /* The set, as given. Times are film time with zero on the first frame of
-     picture, in the 148-minute version. Count-in bars are chosen so each one
-     lands around three and a half seconds, which at these tempos means very
-     different bar counts. */
+     picture, in the 148-minute version. Two bars in on all of them. */
   [
-    [252,  'Underworld', 69,  4, 4, 1, 'At the shift change.'],
-    [412,  'Games',      126, 2, 4, 3, 'After the workers return home — the rolling text screen.'],
-    [605,  'Maria',      69,  4, 4, 1, 'Maria and the children enter.'],
-    [828,  'Machines',   280, 4, 4, 4, 'Freder in the machine hall, searching.']
+    [252,  'Underworld', 69,  4, 4, 2, 'At the shift change.'],
+    [412,  'Games',      126, 2, 4, 2, 'After the workers return home — the rolling text screen.'],
+    [605,  'Maria',      69,  4, 4, 2, 'Maria and the children enter.'],
+    [828,  'Machines',   280, 4, 4, 2, 'Freder in the machine hall, searching.']
   ].forEach(function(r){
     cues.push({
       id: uid(), t: r[0], kind: 'song', title: r[1],
@@ -1106,7 +1104,7 @@ function normaliseCue(c){
     bpm: c.bpm ? Number(c.bpm) : null,
     sig: Number(c.sig) || 4,
     sigd: Number(c.sigd) || 4,
-    bars: c.bars == null ? 1 : Number(c.bars),
+    bars: c.bars == null ? 2 : Number(c.bars),
     lead: c.lead == null || c.lead === '' ? null : Number(c.lead)
   };
 }
@@ -1649,7 +1647,7 @@ function openEdit(c){
   $('eBpm').value = c.bpm || '';
   $('eSig').value = c.sig || 4;
   $('eSigD').value = c.sigd || 4;
-  $('eBars').value = c.bars == null ? 1 : c.bars;
+  $('eBars').value = c.bars == null ? 2 : c.bars;
   $('eLead').value = c.lead == null ? '' : c.lead;
   $('eSync').checked = c.sync;
   $('eEst').checked = c.est;
@@ -1713,7 +1711,7 @@ function splitFields(line){
 }
 function parseSongLine(line){
   var f = splitFields(line).map(function(x){ return x.trim(); });
-  var out = { raw: line, err: null, t: null, title: '', bpm: null, sig: 4, sigd: 4, bars: 1, note: '' };
+  var out = { raw: line, err: null, t: null, title: '', bpm: null, sig: 4, sigd: 4, bars: 2, note: '' };
 
   /* the time column is optional, and may be a placeholder */
   var timeTok = f.shift() || '';
@@ -1790,7 +1788,7 @@ function placeSongs(rows){
 }
 function songsToText(){
   return CUES.filter(function(c){ return c.kind === 'song'; }).map(function(c){
-    var f = [fmtTC(c.t), c.title, c.bpm || '', sigLabel(c), c.bars == null ? 1 : c.bars, c.note || ''];
+    var f = [fmtTC(c.t), c.title, c.bpm || '', sigLabel(c), c.bars == null ? 2 : c.bars, c.note || ''];
     while(f.length && f[f.length - 1] === '') f.pop();
     return f.join(' , ');
   }).join('\n');
