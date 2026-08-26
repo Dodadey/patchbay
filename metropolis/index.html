@@ -1034,17 +1034,23 @@ function seedCues(){
       sync: !!r[4], est: true, bpm: null, sig: 4, sigd: 4, bars: 1, lead: null
     };
   });
-  /* Two worked examples so the count-in is visible on first run. Delete them. */
-  cues.push({
-    id: uid(), t: 600, kind: 'song', title: 'EXAMPLE — "Moloch" (delete me)',
-    note: 'Example song cue. It shows how a tempo turns into a full-screen count-in: two bars of 4 at 96bpm land the downbeat on the explosion.',
-    sync: false, est: true, bpm: 96, sig: 4, sigd: 4, bars: 2, lead: 90
+  /* The set, as given. Times are film time with zero on the first frame of
+     picture, in the 148-minute version. Count-in bars are chosen so each one
+     lands around three and a half seconds, which at these tempos means very
+     different bar counts. */
+  [
+    [252,  'Underworld', 69,  4, 4, 1, 'At the shift change.'],
+    [412,  'Games',      126, 2, 4, 3, 'After the workers return home — the rolling text screen.'],
+    [605,  'Maria',      69,  4, 4, 1, 'Maria and the children enter.'],
+    [828,  'Machines',   280, 4, 4, 4, 'Freder in the machine hall, searching.']
+  ].forEach(function(r){
+    cues.push({
+      id: uid(), t: r[0], kind: 'song', title: r[1],
+      bpm: r[2], sig: r[3], sigd: r[4], bars: r[5], note: r[6],
+      sync: false, est: false, lead: null
+    });
   });
-  cues.push({
-    id: uid(), t: 7080, kind: 'song', title: 'EXAMPLE — "Heart Machine" (delete me)',
-    note: 'Example song cue in 6/8 at 132. Delete both examples once your own sheet is in.',
-    sync: false, est: true, bpm: 132, sig: 6, sigd: 8, bars: 1, lead: 120
-  });
+
   cues.sort(function(a, b){ return a.t - b.t; });
   return cues;
 }
