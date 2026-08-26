@@ -791,6 +791,19 @@ code{
         machine and the app will free-run instead, which is what the sync points are for.
         iPadOS forgets the file on reload, so re-pick it after a restart.</p>
       <div class="frow">
+        <label>CLOCK SOURCE</label>
+        <div class="seg" id="setClockSrc">
+          <button data-src="video">FILE IS THE CLOCK</button>
+          <button data-src="free">FILE FOLLOWS</button>
+        </div>
+        <span class="hint">Pick <b>file is the clock</b> when this iPad's copy is the only film in
+          the room &mdash; rehearsal, or the picture coming off the iPad itself. Nothing can drift,
+          and scrubbing seeks the picture. Pick <b>file follows</b> when the audience is watching a
+          projector or another machine: that is a second, independent player, so the app free-runs,
+          you hold it to the projected print with the sync points, and this copy gets dragged along
+          behind as a reference picture rather than being believed.</span>
+      </div>
+      <div class="frow">
         <label>START OFFSET</label>
         <input type="number" id="setVidOffset" step="0.1" placeholder="0">
         <span class="hint">Seconds to add to the video's own time to get film time. Use it if your file
@@ -1026,6 +1039,7 @@ function defaultSettings(){
     preroll: 15,
     lastVideoName: '',
     vidSize: 'docked',
+    clockSource: 'video',   /* 'video' = the file drives; 'free' = it follows */
     rate: 1
   };
 }
@@ -1081,56 +1095,95 @@ function sortCues(){ CUES.sort(function(a, b){ return a.t - b.t || (a.kind === '
 var vid = $('film');
 var T = { running: false, anchorFilm: 0, anchorWall: 0, hasVideo: false };
 
+/* The loaded file either IS the clock, or is a reference picture slaved to a
+   free-running clock. The second is what you want when the film the audience
+   sees comes off another machine: two players are two clocks, and the one on
+   the wall is the one that matters. */
+function videoMaster(){ return T.hasVideo && SET.clockSource !== 'free'; }
+
 function filmTime(){
-  if(T.hasVideo) return vid.currentTime + SET.vidOffset;
+  if(videoMaster()) return vid.currentTime + SET.vidOffset;
   if(!T.running) return T.anchorFilm;
   return T.anchorFilm + (nowSec() - T.anchorWall) * SET.rate;
 }
+function seekVideo(t){
+  if(!T.hasVideo) return;
+  try{ vid.currentTime = clamp(t - SET.vidOffset, 0, vid.duration || 1e9); }catch(e){}
+}
 function setFilmTime(t){
   t = clamp(t, 0, Math.max(SET.dur, 60) + 600);
-  if(T.hasVideo){
-    try{ vid.currentTime = clamp(t - SET.vidOffset, 0, vid.duration || 1e9); }catch(e){}
+  if(videoMaster()){
+    seekVideo(t);
   }else{
     T.anchorFilm = t;
     T.anchorWall = nowSec();
+    seekVideo(t);          /* keep the reference picture with us */
   }
   resetClickGrid();
 }
 function nudge(d){
-  if(T.hasVideo){ setFilmTime(filmTime() + d); }
+  if(videoMaster()){ setFilmTime(filmTime() + d); }
   else{
     var f = filmTime();
     T.anchorFilm = f + d;
     T.anchorWall = nowSec();
+    seekVideo(T.anchorFilm);
   }
   resetClickGrid();
   toast((d > 0 ? '+' : '') + d.toFixed(d % 1 ? 1 : 0) + 's  →  ' + fmtTC(filmTime(), true));
 }
+function playVideo(){
+  var p = vid.play();
+  if(p && p.catch) p.catch(function(){ toast('Tap the film window once to allow playback', 'warn'); });
+}
 function play(){
   unlockAudio();
-  if(T.hasVideo){
-    var p = vid.play();
-    if(p && p.catch) p.catch(function(){ toast('Tap the film window once to allow playback', 'warn'); });
+  if(videoMaster()){
+    playVideo();
   }else{
-    if(T.running) return;
-    T.anchorWall = nowSec();
-    T.running = true;
+    if(!T.running){
+      T.anchorWall = nowSec();
+      T.running = true;
+    }
+    if(T.hasVideo) playVideo();
   }
   requestWake();
   resetClickGrid();
   reflectRunning();
 }
 function pause(){
-  if(T.hasVideo){ vid.pause(); }
-  else{
-    if(!T.running) return;
-    T.anchorFilm = filmTime();
-    T.running = false;
+  if(videoMaster()){
+    vid.pause();
+  }else{
+    if(T.running){
+      T.anchorFilm = filmTime();
+      T.running = false;
+    }
+    if(T.hasVideo) vid.pause();
   }
   reflectRunning();
 }
 function toggle(){ (isRunning() ? pause : play)(); }
-function isRunning(){ return T.hasVideo ? !vid.paused && !vid.ended : T.running; }
+function isRunning(){ return videoMaster() ? (!vid.paused && !vid.ended) : T.running; }
+
+/* Hold a slaved picture against the clock: match its rate so it stays put
+   between corrections, and only re-seek when it has actually wandered. */
+var lastSlaveFix = 0;
+function followVideo(t){
+  if(!T.hasVideo || videoMaster() || vid.readyState < 1) return;
+  if(T.running && vid.paused) playVideo();
+  if(!T.running && !vid.paused) vid.pause();
+  var r = clamp(SET.rate, 0.25, 4);
+  if(Math.abs(vid.playbackRate - r) > 0.001){
+    try{ vid.playbackRate = r; }catch(e){}
+  }
+  var drift = (t - SET.vidOffset) - vid.currentTime;
+  var w = nowSec();
+  if(Math.abs(drift) > 0.35 && w - lastSlaveFix > 0.75){
+    lastSlaveFix = w;
+    seekVideo(t);
+  }
+}
 function reflectRunning(){
   var r = isRunning();
   document.body.classList.toggle('running', r);
@@ -1261,6 +1314,7 @@ var last = { clock: '', now: '', next: '', up: '', ciBeat: null, dots: 0 };
 
 function render(){
   var t = filmTime();
+  followVideo(t);
 
   /* clock */
   var cs = fmtTC(t);
@@ -1778,7 +1832,7 @@ function syncTo(c){
   /* Two syncs far enough apart measure how fast our clock runs against the
      print. A 23.976 vs 24 fps mismatch is ~9s adrift over the whole film, so
      it is worth knowing about rather than nudging away all night. */
-  if(!T.hasVideo && lastSync && wall - lastSync.wall > 120){
+  if(!videoMaster() && lastSync && wall - lastSync.wall > 120){
     var filmSpan = t - lastSync.film;
     var wallSpan = wall - lastSync.wall;
     var appliedSpan = wallSpan * SET.rate;
@@ -1902,7 +1956,8 @@ $('videoFile').addEventListener('change', function(e){
   setVidSize(SET.vidSize || 'docked');
   refreshChips();
   reflectRunning();
-  toast('Film loaded — the video is now the clock', 'good');
+  toast(videoMaster() ? 'Film loaded — the video is now the clock'
+                      : 'Film loaded — it will follow the free-running clock', 'good');
 });
 vid.addEventListener('loadedmetadata', function(){
   if(vid.duration && isFinite(vid.duration)){
@@ -1973,6 +2028,9 @@ function syncSetupForm(){
   Array.prototype.forEach.call($('setClickMode').children, function(b){
     b.classList.toggle('on', b.dataset.c === SET.clickMode);
   });
+  Array.prototype.forEach.call($('setClockSrc').children, function(b){
+    b.classList.toggle('on', b.dataset.src === (SET.clockSource === 'free' ? 'free' : 'video'));
+  });
   $('verNote').textContent = 'Metropolis Live Cue v' + VERSION +
     ' · ' + CUES.length + ' cues · everything is stored on this device only.';
 }
@@ -2004,6 +2062,15 @@ $('setWake').onchange = function(){ SET.wake = this.checked; save(); this.checke
 $('setFlash').onchange = function(){ SET.flash = this.checked; save(); };
 $('setShow').onchange = function(){ SET.show = this.value; save(); };
 $('setTestClick').onclick = function(){ unlockAudio(); if(actx){ blip(actx.currentTime + 0.02, true); blip(actx.currentTime + 0.3, false); } };
+Array.prototype.forEach.call($('setClockSrc').children, function(b){
+  b.onclick = function(){
+    var was = filmTime(), wasRunning = isRunning();
+    SET.clockSource = b.dataset.src;
+    T.anchorFilm = was; T.anchorWall = nowSec(); T.running = wasRunning;
+    if(videoMaster() && wasRunning) playVideo();
+    save(); syncSetupForm(); refreshChips(); reflectRunning();
+  };
+});
 Array.prototype.forEach.call($('setClickMode').children, function(b){
   b.onclick = function(){ SET.clickMode = b.dataset.c; if(SET.clickMode !== 'off') unlockAudio(); save(); syncSetupForm(); refreshChips(); };
 });
@@ -2082,12 +2149,13 @@ $('btnFull').onclick = function(){
 
 /* ------------------------------- chips --------------------------------- */
 function refreshChips(){
-  $('chipMode').textContent = T.hasVideo ? 'FILM CLOCK' : 'FREE RUN';
-  $('chipMode').className = 'chip ' + (T.hasVideo ? 'on' : 'live');
-  $('chipDrift').textContent = T.hasVideo
+  $('chipMode').textContent = videoMaster() ? 'FILM CLOCK'
+    : (T.hasVideo ? 'FREE RUN · FILM FOLLOWS' : 'FREE RUN');
+  $('chipMode').className = 'chip ' + (videoMaster() ? 'on' : 'live');
+  $('chipDrift').textContent = videoMaster()
     ? 'OFFSET ' + (SET.vidOffset >= 0 ? '+' : '') + SET.vidOffset.toFixed(2) + 's'
     : 'SYNC BY HAND';
-  if(!T.hasVideo && Math.abs(SET.rate - 1) > 1e-6){
+  if(!videoMaster() && Math.abs(SET.rate - 1) > 1e-6){
     $('chipDrift').textContent = 'RATE ' + SET.rate.toFixed(4);
     $('chipDrift').className = 'chip warn';
   }else{

@@ -41,6 +41,72 @@ when the app restarts, so re-pick it each session.
 The film window sits **DOCK**ed in the left column by default, or **FLOAT**s
 where you drag it, or goes **FULL** screen behind the cue overlay.
 
+### Which clock, and when the window is worth having
+
+**SETUP → CLOCK SOURCE** decides what the loaded file is *for*. Get this right
+and the window is worth having; get it wrong and the app confidently follows
+the wrong film.
+
+**FILE IS THE CLOCK** — when this iPad's copy is the only film in the room.
+Rehearsing on the sofa, or working through the cue sheet. Nothing can drift,
+scrubbing seeks the picture, pre-rolls land on the frame. This is where the
+window earns its keep, and where you should build the cue sheet.
+
+**FILE FOLLOWS** — when the audience is watching a projector or another
+machine. That is a second, independent player with its own clock, and the one
+on the wall is the one that matters, so the app free-runs, you hold it to the
+projected print with the sync points, and this copy gets dragged along behind:
+the app matches its speed and re-seeks it whenever it wanders more than a third
+of a second. Syncing or nudging the clock moves the picture with it.
+
+In that second case the window is a **sync check**, not a source of truth — a
+glance to confirm the app and the wall still agree. That is genuinely useful,
+but it is not free: a 148-minute decode is heat and battery. Keep it DOCKed and
+small, or leave it off and trust the sync points, which is what they are for.
+
+If the film is coming *off the iPad itself* into a projector, don't use this
+window at all — mirroring puts the whole cue display on the wall. Play the film
+from a separate machine and let the iPad be the cue display.
+
+### What format the film should be in
+
+This is Safari's decoder, so the safe answer is narrow:
+
+| | |
+|---|---|
+| Container | **`.mp4`** (or `.m4v`). **`.mkv` will not open at all** |
+| Video | **H.264 / AVC**. HEVC also decodes in hardware on a modern iPad and halves the size |
+| Avoid | **VP9 and AV1** — no hardware decode, so 148 minutes of stutter and heat |
+| Size | The film is 4:3. **960×720** is plenty for a docked window; 1280×960 if you want FULL to look good. 1080p is wasted on a reference picture |
+| Bitrate | ~2 Mbps at 720p — about 2 GB for the whole film |
+| Audio | **Strip it.** It is a silent film and you do not want the restoration's score leaking out of the iPad |
+| Frame rate | **Leave it alone**, and make it constant. Do not let a converter "smooth" it to 30 |
+
+In HandBrake: a **Fast 720p** preset, framerate set to *Same as source* and
+*Constant Framerate*, and the audio track removed. Or, in one line:
+
+    ffmpeg -i source.mkv -an -c:v libx264 -crf 22 -preset slow       -vf scale=-2:720 -movflags +faststart metropolis-720.mp4
+
+**Check the runtime before you build the cue sheet.** If your file comes in
+around **142 minutes** rather than 148, it is a PAL-speed transfer running 4%
+fast, and every timecode you stamp against it will be wrong against a 24 fps
+projection. Either work from a 24 fps copy, or accept that this file is
+rehearsal-only and build the sheet against the print you will actually play to.
+
+### Where to keep the file
+
+In the **Files** app, under **On My iPad**. The picker in SETUP reads from
+there.
+
+If it lives in iCloud Drive and has not been downloaded, picking it will stall
+while iOS fetches it — long-press the file and choose **Keep Downloaded** first.
+Leave a few GB of free space.
+
+Nothing is uploaded and nothing is copied: the app reads the file where it sits,
+and it never leaves the iPad. The flip side is that iPadOS drops the handle when
+the app restarts, so **re-pick the file each session**. It takes two taps and
+the app remembers the name to remind you.
+
 ---
 
 ## Syncing to the film
