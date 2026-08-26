@@ -195,6 +195,33 @@ SHEET** appends. Neither touches scene or act markers. **LOAD CURRENT** fills
 the box with the songs already in the sheet in this same format, so you can
 edit the lot as text and put it back.
 
+### When your source has a lead-in
+
+Almost no copy of the film starts on the first frame of picture. Streams and
+transfers open with title cards, a restoration logo or a black head, and often
+carry extra material at the end.
+
+None of that matters to the app, which counts an abstract **film time** rather
+than anything about your file. What matters is that you are **consistent**:
+build the cue sheet against the same source you will play to, and read
+timecodes the same way every time.
+
+There are two ways to be consistent, and either works:
+
+- **Zero at the source's zero.** Timecodes match whatever the player's readout
+  says. Simplest if you always play from that one source; the lead-in and the
+  tail are just dead air with no cues in them.
+- **Zero at the first frame of picture.** Portable to any print, but you have
+  to subtract the lead-in from every reading you take.
+
+If you get it wrong, or change source, **SHIFT** in the cue sheet fixes it in
+one move. Stamp the one cue you can actually see, work out how far it moved,
+type the difference and press **ALL CUES**. Type `+47` for forty-seven seconds
+or `−1:12` for a minute twelve; the opposite sign puts it back. **FROM PLAYHEAD
+ON** shifts only what comes after the current position, for a print that gains
+an extra title card partway through. Cues pushed below 0:00 pile up at zero and
+the app says so — that part cannot be undone by shifting back.
+
 ### Building the real sheet
 
 The seed sheet ships with the film's landmarks **in the right running order**

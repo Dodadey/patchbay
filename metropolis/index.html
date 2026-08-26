@@ -406,6 +406,18 @@ h3.sec:first-child{margin-top:0;}
 #toast.good{color:var(--green); border-color:#26543c;}
 #toast.warn{color:var(--amber); border-color:var(--gold-dim);}
 
+/* shift bar */
+.shiftBar{
+  display:flex; gap:8px; align-items:center; flex-wrap:wrap;
+  padding:10px 12px; border:1px solid var(--line); border-radius:9px;
+  background:var(--panel); margin-bottom:6px;
+}
+.shiftBar .shiftLab{
+  font-family:var(--mono); font-size:10px; letter-spacing:.22em; color:var(--faint);
+  flex:0 0 auto;
+}
+.shiftBar input{flex:0 0 148px; font-family:var(--mono); font-size:14px;}
+
 /* song sheet (bulk text entry) */
 #songText{
   width:100%; min-height:210px; font-family:var(--mono); font-size:14px; line-height:1.55;
@@ -586,6 +598,18 @@ code{
         verifying against your print. Play the film and hit <b>STAMP</b> on a row as each moment
         lands &mdash; that writes the real timecode and clears the flag.
       </div>
+      <div class="shiftBar">
+        <span class="shiftLab">SHIFT</span>
+        <input type="text" id="shiftAmt" spellcheck="false" placeholder="+47  or  −1:12">
+        <button class="mini stamp" id="shiftAll">ALL CUES</button>
+        <button class="mini stamp" id="shiftFrom">FROM PLAYHEAD ON</button>
+      </div>
+      <p class="note" style="margin:0 0 14px">
+        Moves timecodes in bulk. Use it when your source has a lead-in before the picture, or an
+        extra title card partway through: stamp the one cue you can see, work out how far it moved,
+        and bring the rest with it. Shifting by the same amount with the opposite sign puts it
+        straight back.
+      </p>
       <div id="cueList"></div>
     </div>
     <div class="dfoot">
@@ -965,7 +989,7 @@ function toast(msg, kind){
 function seedCues(){
   var raw = [
     [0,        'act',   'VORSPIEL — Prelude', '', 1],
-    [0,        'scene', 'Film start — first frame of picture', 'Zero the clock here. This is the reference every other timecode hangs off.', 1],
+    [0,        'scene', 'First frame of picture', 'The reference every other timecode hangs off. If your source opens with title cards, a logo or any other lead-in, stamp this cue on the real first frame and then SHIFT ALL CUES by the same amount to bring the sheet with it.', 1],
     [80,       'scene', 'Shift change — the ten-hour clock', 'Pistons, the whistle, the column of workers trudging into the lift.', 1],
     [270,      'scene', 'The Eternal Gardens — Freder', 'Fountains, the peacock, Freder chasing the girl.', 0],
     [370,      'scene', 'Maria at the gate — "These are your brothers"', 'The doors open, the children, Freder frozen. Unmistakable frame.', 1],
@@ -1566,6 +1590,33 @@ function renderCueList(){
   });
   $('estBanner').classList.toggle('hide', !anyEst);
 }
+function shiftCues(delta, fromPlayhead){
+  var from = fromPlayhead ? filmTime() : -Infinity, n = 0, clamped = 0;
+  CUES.forEach(function(c){
+    if(c.t < from) return;
+    var want = Math.round((c.t + delta) * 10) / 10;
+    if(want < 0){ want = 0; clamped++; }   /* piles up at zero — and cannot be undone */
+    c.t = want;
+    n++;
+  });
+  sortCues(); save(); renderCueList(); drawTimeline(); renderOrder(); refreshChips();
+  last.next = ''; last.now = ''; last.up = '';
+  var msg = n + ' cue' + (n === 1 ? '' : 's') + ' shifted by ' +
+    (delta >= 0 ? '+' : '−') + fmtShort(Math.abs(delta));
+  if(clamped){
+    toast(msg + ' — ' + clamped + ' hit 0:00 and cannot be shifted back', 'warn');
+  }else{
+    toast(msg, 'good');
+  }
+}
+function doShift(fromPlayhead){
+  var d = parseTC($('shiftAmt').value);
+  if(d == null || d === 0){ toast('Enter an amount, e.g. +47 or −1:12', 'warn'); return; }
+  shiftCues(d, fromPlayhead);
+}
+$('shiftAll').onclick = function(){ doShift(false); };
+$('shiftFrom').onclick = function(){ doShift(true); };
+
 $('btnCues').onclick = function(){ renderCueList(); openScrim('cueScrim'); };
 $('cueAdd').onclick = function(){
   var c = normaliseCue({ t: Math.round(filmTime() * 10) / 10, kind: 'song', title: 'New cue', est: false });
