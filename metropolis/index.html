@@ -257,6 +257,7 @@ body.stopped #clock{color:var(--faint);}
 .btn.play{background:var(--green); border-color:var(--green); color:#062012; font-weight:700; min-width:96px; justify-content:center;}
 body.running .btn.play{background:var(--panel); border-color:var(--line2); color:var(--ink); font-weight:600;}
 .btn.sync{background:#1a1206; border-color:var(--gold-dim); color:var(--gold); font-weight:700;}
+.btn.mark{background:#0c1a12; border-color:#26543c; color:var(--green); font-weight:700;}
 .btn.nudge{padding:11px 10px; color:var(--dim); min-width:52px; justify-content:center;}
 .sep{width:1px; background:var(--line); margin:2px 3px; flex:0 0 auto;}
 
@@ -280,6 +281,12 @@ body.running .btn.play{background:var(--panel); border-color:var(--line2); color
 }
 #countin.hit #ciBeat{color:var(--gold);}
 #countin.acc #ciBeat{color:var(--red);}
+#ciClock{
+  position:absolute; top:calc(14px + var(--safe-t)); right:calc(18px + var(--safe-r));
+  font-family:var(--mono); font-variant-numeric:tabular-nums; font-weight:600;
+  font-size:clamp(15px,2.2vw,26px); color:var(--dim); letter-spacing:.02em; text-align:right;
+}
+#ciClock small{display:block; font-size:.5em; letter-spacing:.2em; color:var(--faint); margin-top:2px;}
 #ciDots{display:flex; gap:12px; margin-top:4px;}
 #ciDots i{
   width:clamp(12px,2vw,22px); height:clamp(12px,2vw,22px); border-radius:50%;
@@ -505,6 +512,7 @@ code{
           <span>LEFT <b id="remain">2:28:00</b></span>
           <span>REEL <b id="reelPct">0%</b></span>
           <span id="offsetLine">OFFSET <b id="offsetVal">0.00s</b></span>
+          <span id="srcLine">PLAYER <b id="srcVal">0:00:00</b></span>
         </div>
       </div>
       <div class="card" id="nowCard">
@@ -544,6 +552,7 @@ code{
   <footer id="transport">
     <button class="btn play" id="btnPlay">START</button>
     <button class="btn sync" id="btnSync">SYNC</button>
+    <button class="btn mark" id="btnMark">MARK</button>
     <div class="sep"></div>
     <button class="btn nudge" data-nudge="-1">&minus;1s</button>
     <button class="btn nudge" data-nudge="-0.1">&minus;.1</button>
@@ -562,6 +571,7 @@ code{
 
 <!-- count-in takeover -->
 <div id="countin">
+  <div id="ciClock">0:00:00<small>FILM TIME</small></div>
   <div id="ciLabel">COUNT IN</div>
   <div id="ciTitle">—</div>
   <div id="ciBeat">4</div>
@@ -670,10 +680,10 @@ code{
       </div>
       <div class="frow">
         <label>COUNT-IN BARS</label>
-        <input type="number" id="eBars" min="0" max="8" step="1" placeholder="2">
+        <input type="number" id="eBars" min="0" max="8" step="1" placeholder="4">
         <span class="hint">Leave tempo blank for cues that need no count-in. With a tempo set, the
           full-screen count-in takes over that many bars before the downbeat, and a bar|beat readout
-          keeps running once the song is under way. Two bars is the house default.</span>
+          keeps running once the song is under way. Four bars is the house default.</span>
       </div>
 
       <h3 class="sec">SYNC</h3>
@@ -728,7 +738,7 @@ code{
         <p class="note">
           Leave the <b>tempo</b> out and the song simply gets no count-in. Leave
           <b>beats-per-bar</b> out and it assumes 4; leave <b>count-in bars</b> out and it
-          assumes 2. Write the tempo however you like &mdash; <code>96</code>, <code>96bpm</code>
+          assumes 4. Write the tempo however you like &mdash; <code>96</code>, <code>96bpm</code>
           and <code>&#9833;=96</code> all read the same. Write the signature as <code>6/8</code>,
           <code>3/4</code> or just <code>6</code>; the top number is what gets counted.
           A line starting with <code>#</code> is ignored, so you can leave yourself notes.
@@ -758,13 +768,23 @@ code{
 <div class="scrim" id="syncScrim">
   <div class="drawer">
     <div class="dhead">
-      <h2>SYNC TO A LANDMARK</h2>
+      <h2>SYNC</h2>
+      <button class="tbtn" id="syncScope">ALL CUES</button>
       <button class="tbtn" id="syncClose">CLOSE</button>
     </div>
     <div class="dbody">
+      <div class="shiftBar">
+        <span class="shiftLab" id="syncJumpLab">FILM TIME</span>
+        <input type="text" id="syncJumpTime" spellcheck="false" placeholder="1:02:33">
+        <button class="mini go" id="syncJumpGo">GO</button>
+      </div>
+      <p class="note" style="margin:0 0 14px" id="syncJumpNote">
+        Read the position off your player and type it here. No waiting for a landmark to come round.
+      </p>
       <div class="banner">
-        Tap a landmark <b>at the instant it hits the screen</b>. The clock jumps to that timecode,
-        with your tap-latency allowance taken off. Nearest landmarks to the current position are listed first.
+        Or tap a cue below <b>at the instant it hits the screen</b>. The clock jumps to that timecode,
+        less your tap-latency allowance. Nearest first. <b>ALL CUES</b> in the header widens the list
+        beyond the cues flagged as landmarks.
       </div>
       <div id="syncList"></div>
     </div>
@@ -783,6 +803,13 @@ code{
         <label>TIMECODE</label>
         <input type="text" id="gotoTime" placeholder="1:02:33" style="flex:0 0 160px">
         <button class="mini go" id="gotoJump">GO</button>
+      </div>
+      <div class="frow" id="gotoSrcRow">
+        <label>PLAYER TIME</label>
+        <input type="text" id="gotoSrcTime" spellcheck="false" placeholder="1:03:03" style="flex:0 0 160px">
+        <button class="mini go" id="gotoSrcJump">GO</button>
+        <span class="hint">Type the number your player is showing and the app converts it to film
+          time for you.</span>
       </div>
       <div class="frow">
         <label class="check" style="flex:1">
@@ -839,6 +866,16 @@ code{
         <label>FILM LENGTH</label>
         <input type="text" id="setDur" placeholder="2:28:00" style="flex:0 0 140px">
         <span class="hint">Only drives the timeline scale and the remaining-time readout.</span>
+      </div>
+      <div class="frow">
+        <label>PLAYER OFFSET</label>
+        <input type="text" id="setSrcOffset" spellcheck="false" placeholder="0:30" style="flex:0 0 150px">
+        <button class="mini stamp" id="setSrcFromPlayer">WORK IT OUT</button>
+        <span class="hint">The difference between film time and whatever your player's scrubber
+          says &mdash; Apple TV, a projectionist's machine, a colleague quoting a YouTube position.
+          Set it and a <b>PLAYER</b> readout appears beside the film clock, so you can call out
+          either number without doing sums. <b>WORK IT OUT</b> asks what your player reads right
+          now and works the offset out from that.</span>
       </div>
       <div class="frow">
         <label>DEFAULT LEAD</label>
@@ -1031,16 +1068,16 @@ function seedCues(){
   var cues = raw.map(function(r){
     return {
       id: uid(), t: r[0], kind: r[1], title: r[2], note: r[3] || '',
-      sync: !!r[4], est: true, bpm: null, sig: 4, sigd: 4, bars: 2, lead: null
+      sync: !!r[4], est: true, bpm: null, sig: 4, sigd: 4, bars: 4, lead: null
     };
   });
   /* The set, as given. Times are film time with zero on the first frame of
-     picture, in the 148-minute version. Two bars in on all of them. */
+     picture, in the 148-minute version. Four bars in on all of them. */
   [
-    [252,  'Underworld', 69,  4, 4, 2, 'At the shift change.'],
-    [412,  'Games',      126, 2, 4, 2, 'After the workers return home — the rolling text screen.'],
-    [605,  'Maria',      69,  4, 4, 2, 'Maria and the children enter.'],
-    [828,  'Machines',   280, 4, 4, 2, 'Freder in the machine hall, searching.']
+    [252,  'Underworld', 69,  4, 4, 4, 'At the shift change.'],
+    [412,  'Games',      126, 2, 4, 4, 'After the workers return home — the rolling text screen.'],
+    [605,  'Maria',      69,  4, 4, 4, 'Maria and the children enter.'],
+    [828,  'Machines',   280, 4, 4, 4, 'Freder in the machine hall, searching.']
   ].forEach(function(r){
     cues.push({
       id: uid(), t: r[0], kind: 'song', title: r[1],
@@ -1068,6 +1105,7 @@ function defaultSettings(){
     lastVideoName: '',
     vidSize: 'docked',
     clockSource: 'video',   /* 'video' = the file drives; 'free' = it follows */
+    srcOffset: 0,           /* film time + this = what the external player shows */
     rate: 1
   };
 }
@@ -1104,7 +1142,7 @@ function normaliseCue(c){
     bpm: c.bpm ? Number(c.bpm) : null,
     sig: Number(c.sig) || 4,
     sigd: Number(c.sigd) || 4,
-    bars: c.bars == null ? 2 : Number(c.bars),
+    bars: c.bars == null ? 4 : Number(c.bars),
     lead: c.lead == null || c.lead === '' ? null : Number(c.lead)
   };
 }
@@ -1335,8 +1373,9 @@ var ui = {
   nowTitle: $('nowTitle'), nowNote: $('nowNote'), nowMeta: $('nowMeta'),
   nextCard: $('nextCard'), nextTitle: $('nextTitle'), nextCount: $('nextCount'),
   nextNote: $('nextNote'), nextMeta: $('nextMeta'), upcoming: $('upcoming'),
+  srcVal: $('srcVal'),
   head: $('tlHead'), ci: $('countin'), ciTitle: $('ciTitle'), ciBeat: $('ciBeat'),
-  ciDots: $('ciDots'), ciSub: $('ciSub'), ciLabel: $('ciLabel')
+  ciDots: $('ciDots'), ciSub: $('ciSub'), ciLabel: $('ciLabel'), ciClock: $('ciClock')
 };
 var last = { clock: '', now: '', next: '', up: '', ciBeat: null, dots: 0 };
 
@@ -1352,6 +1391,7 @@ function render(){
     last.clock = cs + frac;
     ui.remain.textContent = fmtTC(Math.max(0, SET.dur - t));
     ui.reelPct.textContent = Math.round(clamp(t / SET.dur, 0, 1) * 100) + '%';
+    if(SET.srcOffset) ui.srcVal.textContent = fmtTC(t + SET.srcOffset);
   }
   ui.head.style.left = (clamp(t / SET.dur, 0, 1) * 100) + '%';
 
@@ -1459,6 +1499,7 @@ function render(){
       var dots = ui.ciDots.children;
       for(var j = 0; j < dots.length; j++) dots[j].classList.toggle('on', j <= beat - 1);
     }
+    ui.ciClock.innerHTML = cs + '<small>FILM TIME</small>';
     var into = (elapsed % cbd) / cbd;
     ui.ci.classList.toggle('hit', into < 0.16);
     ui.ci.classList.toggle('acc', into < 0.16 && beat === 1);
@@ -1647,7 +1688,7 @@ function openEdit(c){
   $('eBpm').value = c.bpm || '';
   $('eSig').value = c.sig || 4;
   $('eSigD').value = c.sigd || 4;
-  $('eBars').value = c.bars == null ? 2 : c.bars;
+  $('eBars').value = c.bars == null ? 4 : c.bars;
   $('eLead').value = c.lead == null ? '' : c.lead;
   $('eSync').checked = c.sync;
   $('eEst').checked = c.est;
@@ -1711,7 +1752,7 @@ function splitFields(line){
 }
 function parseSongLine(line){
   var f = splitFields(line).map(function(x){ return x.trim(); });
-  var out = { raw: line, err: null, t: null, title: '', bpm: null, sig: 4, sigd: 4, bars: 2, note: '' };
+  var out = { raw: line, err: null, t: null, title: '', bpm: null, sig: 4, sigd: 4, bars: 4, note: '' };
 
   /* the time column is optional, and may be a placeholder */
   var timeTok = f.shift() || '';
@@ -1788,7 +1829,7 @@ function placeSongs(rows){
 }
 function songsToText(){
   return CUES.filter(function(c){ return c.kind === 'song'; }).map(function(c){
-    var f = [fmtTC(c.t), c.title, c.bpm || '', sigLabel(c), c.bars == null ? 2 : c.bars, c.note || ''];
+    var f = [fmtTC(c.t), c.title, c.bpm || '', sigLabel(c), c.bars == null ? 4 : c.bars, c.note || ''];
     while(f.length && f[f.length - 1] === '') f.pop();
     return f.join(' , ');
   }).join('\n');
@@ -1908,14 +1949,50 @@ function syncTo(c){
   closeScrim('syncScrim');
   toast(msg, 'good');
 }
+/* Dropping a mark is the fast way to build a dense sheet during a watch-through:
+   one tap, no dialog, and it doubles as a sync point because you only mark
+   things you just recognised on screen. */
+function markHere(){
+  var t = Math.round(filmTime() * 10) / 10;
+  var c = normaliseCue({ t: t, kind: 'cue', title: 'Mark ' + fmtTC(t), sync: true, est: false });
+  CUES.push(c);
+  sortCues(); save();
+  if($('cueScrim').classList.contains('show')) renderCueList();
+  drawTimeline(); renderOrder(); refreshChips();
+  last.next = ''; last.now = ''; last.up = '';
+  toast('Marked ' + fmtTC(t, true) + '  ·  ' + CUES.filter(function(x){ return x.sync; }).length + ' sync points', 'good');
+}
+$('btnMark').onclick = markHere;
+
+var syncShowAll = false;
+$('syncScope').onclick = function(){
+  syncShowAll = !syncShowAll;
+  $('syncScope').textContent = syncShowAll ? 'LANDMARKS ONLY' : 'ALL CUES';
+  $('syncScope').classList.toggle('active', syncShowAll);
+  renderSyncList();
+};
+$('syncJumpGo').onclick = function(){
+  var v = parseTC($('syncJumpTime').value);
+  if(v == null){ toast('Timecode not understood', 'warn'); return; }
+  var film = v - (SET.srcOffset || 0);
+  setFilmTime(film);
+  closeScrim('syncScrim');
+  if(!isRunning()) play();
+  toast('Jumped to ' + fmtTC(Math.max(0, film)));
+};
+
 function renderSyncList(){
   var box = $('syncList');
   box.innerHTML = '';
   var t = filmTime();
-  var pts = CUES.filter(function(c){ return c.sync; })
+  $('syncJumpLab').textContent = SET.srcOffset ? 'PLAYER TIME' : 'FILM TIME';
+  $('syncJumpNote').textContent = SET.srcOffset
+    ? 'Read the position off your player and type it here — the offset is applied for you. No waiting for a landmark to come round.'
+    : 'Type the position you are at and the clock jumps there. No waiting for a landmark to come round. Set a PLAYER OFFSET in SETUP and this accepts your player\u2019s own numbers instead.';
+  var pts = CUES.filter(function(c){ return syncShowAll ? c.kind !== 'act' : c.sync; })
     .sort(function(a, b){ return Math.abs(a.t - t) - Math.abs(b.t - t); });
   if(!pts.length){
-    box.appendChild(el('p', 'note', 'No cues are marked as sync points yet. Tick “usable as a sync point” on any cue with an unmistakable frame.'));
+    box.appendChild(el('p', 'note', 'Nothing to list yet. Hit MARK in the transport as the film plays and every mark lands here.'));
     return;
   }
   pts.forEach(function(c){
@@ -1942,6 +2019,7 @@ function gotoCue(c, roll){
   toast('From ' + fmtTC(filmTime()) + ' → ' + c.title.slice(0, 26));
 }
 function openGoto(pref){
+  $('gotoSrcRow').style.display = SET.srcOffset ? '' : 'none';
   var box = $('gotoList');
   box.innerHTML = '';
   $('gotoTime').value = fmtTC(pref ? pref.t : filmTime());
@@ -1968,6 +2046,15 @@ $('gotoJump').onclick = function(){
   setFilmTime(t);
   closeScrim('gotoScrim');
   if(!isRunning()) play();
+};
+$('gotoSrcJump').onclick = function(){
+  var t = parseTC($('gotoSrcTime').value);
+  if(t == null){ toast('Timecode not understood', 'warn'); return; }
+  var film = t - SET.srcOffset;
+  setFilmTime(film);
+  closeScrim('gotoScrim');
+  if(!isRunning()) play();
+  toast('Player ' + fmtTC(t) + '  =  film ' + fmtTC(Math.max(0, film)));
 };
 
 /* ------------------------------ transport UI --------------------------- */
@@ -2079,6 +2166,8 @@ function syncSetupForm(){
   $('setShow').value = SET.show;
   $('setVidOffset').value = SET.vidOffset;
   $('setRate').value = SET.rate.toFixed(4);
+  $('setSrcOffset').value = SET.srcOffset ? fmtTC(SET.srcOffset) : '';
+  $('gotoSrcRow').style.display = SET.srcOffset ? '' : 'none';
   $('setRateAuto').textContent = measuredRate ? 'USE ' + measuredRate.toFixed(4) : 'USE MEASURED';
   Array.prototype.forEach.call($('setClickMode').children, function(b){
     b.classList.toggle('on', b.dataset.c === SET.clickMode);
@@ -2097,6 +2186,23 @@ $('setDur').onchange = function(){
 };
 $('setLead').onchange = function(){ SET.lead = clamp(parseFloat(this.value) || 60, 1, 900); save(); last.next = ''; };
 $('setLatency').onchange = function(){ SET.latency = clamp(parseFloat(this.value) || 0, 0, 1000); save(); };
+$('setSrcOffset').onchange = function(){
+  var v = parseTC(this.value);
+  SET.srcOffset = v == null ? 0 : v;
+  save(); refreshChips(); syncSetupForm();
+};
+$('setSrcFromPlayer').onclick = function(){
+  var now = filmTime();
+  var said = prompt('What does your player show right now?\n\n' +
+    'The app is at ' + fmtTC(now) + ' film time.');
+  if(said == null) return;
+  var v = parseTC(said);
+  if(v == null){ toast('Timecode not understood', 'warn'); return; }
+  SET.srcOffset = Math.round((v - now) * 10) / 10;
+  save(); syncSetupForm(); refreshChips();
+  toast('Player runs ' + (SET.srcOffset >= 0 ? '+' : '−') + fmtShort(Math.abs(SET.srcOffset)) +
+    ' against film time', 'good');
+};
 $('setRate').onchange = function(){
   var f = filmTime();
   SET.rate = clamp(parseFloat(this.value) || 1, 0.9, 1.1);
@@ -2225,6 +2331,7 @@ function refreshChips(){
   $('chipEst').textContent = CUES.filter(function(c){ return c.est; }).length + ' EST';
   $('offsetVal').textContent = (SET.vidOffset >= 0 ? '+' : '') + SET.vidOffset.toFixed(2) + 's';
   $('offsetLine').style.display = T.hasVideo ? '' : 'none';
+  $('srcLine').style.display = SET.srcOffset ? '' : 'none';
 }
 
 /* ------------------------------ keyboard -------------------------------- */
@@ -2234,6 +2341,7 @@ document.addEventListener('keydown', function(e){
   if(k === ' ' || k === 'spacebar'){ e.preventDefault(); toggle(); }
   else if(k === 's'){ renderSyncList(); openScrim('syncScrim'); }
   else if(k === 'c'){ $('btnClick').click(); }
+  else if(k === 'm'){ markHere(); }
   else if(k === 'f'){ $('btnFull').click(); }
   else if(k === 'e'){ renderCueList(); openScrim('cueScrim'); }
   else if(k === 'g'){ openGoto(null); }

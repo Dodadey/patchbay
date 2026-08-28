@@ -176,7 +176,7 @@ anyone's ears at a show.
     ? , Yoshiwara , 118 , 6/8 , 2 , dance sequence
 
 Only the **title** is compulsory. No tempo means no count-in; no beats-per-bar
-assumes 4; no count-in bars assumes 2. Tempos read the same written `96`,
+assumes 4; no count-in bars assumes 4. Tempos read the same written `96`,
 `96bpm` or `♩=96`. Signatures can be `6/8`, `3/4` or just `6` — the top number
 is what gets counted. Lines starting with `#` are ignored.
 
@@ -221,6 +221,70 @@ or `−1:12` for a minute twelve; the opposite sign puts it back. **FROM PLAYHEA
 ON** shifts only what comes after the current position, for a print that gains
 an extra title card partway through. Cues pushed below 0:00 pile up at zero and
 the app says so — that part cannot be undone by shifting back.
+
+### Working alongside an external player
+
+If the film comes from Apple TV, a projectionist's machine or anything else you
+cannot load as a file, the app free-runs and the sync points hold it to the
+picture. The one nuisance is that your player's scrubber and the app's film
+time will not read the same number, because the player counts from the start of
+its own file, lead-in and all.
+
+#### Putting the film beside it on one iPad
+
+A DRM-protected stream — Apple TV, or any other bought film — cannot be pulled
+into the page. There is no embeddable URL, iPadOS Safari has no screen-capture
+API, and protected video captures as black frames anyway. iPadOS will do it for
+you at the system level instead:
+
+- **Picture in Picture** — start the film in the TV app, put it in PiP, then
+  switch to the cue app. The film floats over the top, movable and resizable.
+  Best for rehearsing, when you want the cue display big.
+- **Split View** — the TV app one side, this the other. Best for building the
+  cue sheet, where you need room for the cue list and its STAMP buttons.
+
+The layout is built for this: at Split View and Slide Over widths it collapses
+to a single column with the clock, running order and NEXT panel all still
+readable, and the transport bar scrolls sideways rather than truncating.
+
+Either way the app cannot see where the film has got to, so this is still free
+run plus sync points. Which is what the offset below is for.
+
+**SETUP → PLAYER OFFSET** settles that. Press **WORK IT OUT**, type whatever
+your player is showing at that moment, and the app works out the difference. A
+**PLAYER** readout then appears next to the film clock, so you can call out
+either number without doing arithmetic, and a **PLAYER TIME** box appears in
+**GO TO** so a position quoted off someone else's scrubber can be typed
+straight in.
+
+The offset is display only. Cue timings, sync points and count-ins all stay in
+film time and are untouched by it.
+
+### MARK — building a dense sheet in one pass
+
+**MARK** in the transport (or `m`) drops a cue at the playhead instantly: no
+dialog, no typing, titled with its own timecode. Every mark is also a **sync
+point**, on the reasoning that you only mark something you just recognised on
+screen.
+
+That is the fast way to fill the sheet out. Play the film, tap MARK at every
+moment you might ever want to sync to or cue from, and stop worrying about
+naming — rename the ones that matter afterwards, delete the rest. Twenty marks
+across the film puts a sync point every seven minutes; sixty puts one every two
+and a half.
+
+Density matters because syncing otherwise means waiting for the next landmark
+to come round. Which brings us to the other half:
+
+### Syncing without waiting
+
+The SYNC drawer takes a typed position as well as a tapped landmark. Read where
+your player has got to, type it into the box at the top, press GO. With a
+**PLAYER OFFSET** set the box takes your player's own numbers and converts
+them; without one it takes film time.
+
+**ALL CUES** in the SYNC header widens the list from cues flagged as landmarks
+to every cue in the sheet, marks included.
 
 ### Building the real sheet
 
