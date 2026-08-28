@@ -230,6 +230,26 @@ picture. The one nuisance is that your player's scrubber and the app's film
 time will not read the same number, because the player counts from the start of
 its own file, lead-in and all.
 
+#### Putting the film beside it on one iPad
+
+A DRM-protected stream — Apple TV, or any other bought film — cannot be pulled
+into the page. There is no embeddable URL, iPadOS Safari has no screen-capture
+API, and protected video captures as black frames anyway. iPadOS will do it for
+you at the system level instead:
+
+- **Picture in Picture** — start the film in the TV app, put it in PiP, then
+  switch to the cue app. The film floats over the top, movable and resizable.
+  Best for rehearsing, when you want the cue display big.
+- **Split View** — the TV app one side, this the other. Best for building the
+  cue sheet, where you need room for the cue list and its STAMP buttons.
+
+The layout is built for this: at Split View and Slide Over widths it collapses
+to a single column with the clock, running order and NEXT panel all still
+readable, and the transport bar scrolls sideways rather than truncating.
+
+Either way the app cannot see where the film has got to, so this is still free
+run plus sync points. Which is what the offset below is for.
+
 **SETUP → PLAYER OFFSET** settles that. Press **WORK IT OUT**, type whatever
 your player is showing at that moment, and the app works out the difference. A
 **PLAYER** readout then appears next to the film clock, so you can call out
