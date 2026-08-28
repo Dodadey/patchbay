@@ -176,7 +176,7 @@ anyone's ears at a show.
     ? , Yoshiwara , 118 , 6/8 , 2 , dance sequence
 
 Only the **title** is compulsory. No tempo means no count-in; no beats-per-bar
-assumes 4; no count-in bars assumes 2. Tempos read the same written `96`,
+assumes 4; no count-in bars assumes 4. Tempos read the same written `96`,
 `96bpm` or `♩=96`. Signatures can be `6/8`, `3/4` or just `6` — the top number
 is what gets counted. Lines starting with `#` are ignored.
 

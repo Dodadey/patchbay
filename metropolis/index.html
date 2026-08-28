@@ -280,6 +280,12 @@ body.running .btn.play{background:var(--panel); border-color:var(--line2); color
 }
 #countin.hit #ciBeat{color:var(--gold);}
 #countin.acc #ciBeat{color:var(--red);}
+#ciClock{
+  position:absolute; top:calc(14px + var(--safe-t)); right:calc(18px + var(--safe-r));
+  font-family:var(--mono); font-variant-numeric:tabular-nums; font-weight:600;
+  font-size:clamp(15px,2.2vw,26px); color:var(--dim); letter-spacing:.02em; text-align:right;
+}
+#ciClock small{display:block; font-size:.5em; letter-spacing:.2em; color:var(--faint); margin-top:2px;}
 #ciDots{display:flex; gap:12px; margin-top:4px;}
 #ciDots i{
   width:clamp(12px,2vw,22px); height:clamp(12px,2vw,22px); border-radius:50%;
@@ -562,6 +568,7 @@ code{
 
 <!-- count-in takeover -->
 <div id="countin">
+  <div id="ciClock">0:00:00<small>FILM TIME</small></div>
   <div id="ciLabel">COUNT IN</div>
   <div id="ciTitle">—</div>
   <div id="ciBeat">4</div>
@@ -670,10 +677,10 @@ code{
       </div>
       <div class="frow">
         <label>COUNT-IN BARS</label>
-        <input type="number" id="eBars" min="0" max="8" step="1" placeholder="2">
+        <input type="number" id="eBars" min="0" max="8" step="1" placeholder="4">
         <span class="hint">Leave tempo blank for cues that need no count-in. With a tempo set, the
           full-screen count-in takes over that many bars before the downbeat, and a bar|beat readout
-          keeps running once the song is under way. Two bars is the house default.</span>
+          keeps running once the song is under way. Four bars is the house default.</span>
       </div>
 
       <h3 class="sec">SYNC</h3>
@@ -728,7 +735,7 @@ code{
         <p class="note">
           Leave the <b>tempo</b> out and the song simply gets no count-in. Leave
           <b>beats-per-bar</b> out and it assumes 4; leave <b>count-in bars</b> out and it
-          assumes 2. Write the tempo however you like &mdash; <code>96</code>, <code>96bpm</code>
+          assumes 4. Write the tempo however you like &mdash; <code>96</code>, <code>96bpm</code>
           and <code>&#9833;=96</code> all read the same. Write the signature as <code>6/8</code>,
           <code>3/4</code> or just <code>6</code>; the top number is what gets counted.
           A line starting with <code>#</code> is ignored, so you can leave yourself notes.
@@ -1031,16 +1038,16 @@ function seedCues(){
   var cues = raw.map(function(r){
     return {
       id: uid(), t: r[0], kind: r[1], title: r[2], note: r[3] || '',
-      sync: !!r[4], est: true, bpm: null, sig: 4, sigd: 4, bars: 2, lead: null
+      sync: !!r[4], est: true, bpm: null, sig: 4, sigd: 4, bars: 4, lead: null
     };
   });
   /* The set, as given. Times are film time with zero on the first frame of
-     picture, in the 148-minute version. Two bars in on all of them. */
+     picture, in the 148-minute version. Four bars in on all of them. */
   [
-    [252,  'Underworld', 69,  4, 4, 2, 'At the shift change.'],
-    [412,  'Games',      126, 2, 4, 2, 'After the workers return home — the rolling text screen.'],
-    [605,  'Maria',      69,  4, 4, 2, 'Maria and the children enter.'],
-    [828,  'Machines',   280, 4, 4, 2, 'Freder in the machine hall, searching.']
+    [252,  'Underworld', 69,  4, 4, 4, 'At the shift change.'],
+    [412,  'Games',      126, 2, 4, 4, 'After the workers return home — the rolling text screen.'],
+    [605,  'Maria',      69,  4, 4, 4, 'Maria and the children enter.'],
+    [828,  'Machines',   280, 4, 4, 4, 'Freder in the machine hall, searching.']
   ].forEach(function(r){
     cues.push({
       id: uid(), t: r[0], kind: 'song', title: r[1],
@@ -1104,7 +1111,7 @@ function normaliseCue(c){
     bpm: c.bpm ? Number(c.bpm) : null,
     sig: Number(c.sig) || 4,
     sigd: Number(c.sigd) || 4,
-    bars: c.bars == null ? 2 : Number(c.bars),
+    bars: c.bars == null ? 4 : Number(c.bars),
     lead: c.lead == null || c.lead === '' ? null : Number(c.lead)
   };
 }
@@ -1336,7 +1343,7 @@ var ui = {
   nextCard: $('nextCard'), nextTitle: $('nextTitle'), nextCount: $('nextCount'),
   nextNote: $('nextNote'), nextMeta: $('nextMeta'), upcoming: $('upcoming'),
   head: $('tlHead'), ci: $('countin'), ciTitle: $('ciTitle'), ciBeat: $('ciBeat'),
-  ciDots: $('ciDots'), ciSub: $('ciSub'), ciLabel: $('ciLabel')
+  ciDots: $('ciDots'), ciSub: $('ciSub'), ciLabel: $('ciLabel'), ciClock: $('ciClock')
 };
 var last = { clock: '', now: '', next: '', up: '', ciBeat: null, dots: 0 };
 
@@ -1459,6 +1466,7 @@ function render(){
       var dots = ui.ciDots.children;
       for(var j = 0; j < dots.length; j++) dots[j].classList.toggle('on', j <= beat - 1);
     }
+    ui.ciClock.innerHTML = cs + '<small>FILM TIME</small>';
     var into = (elapsed % cbd) / cbd;
     ui.ci.classList.toggle('hit', into < 0.16);
     ui.ci.classList.toggle('acc', into < 0.16 && beat === 1);
@@ -1647,7 +1655,7 @@ function openEdit(c){
   $('eBpm').value = c.bpm || '';
   $('eSig').value = c.sig || 4;
   $('eSigD').value = c.sigd || 4;
-  $('eBars').value = c.bars == null ? 2 : c.bars;
+  $('eBars').value = c.bars == null ? 4 : c.bars;
   $('eLead').value = c.lead == null ? '' : c.lead;
   $('eSync').checked = c.sync;
   $('eEst').checked = c.est;
@@ -1711,7 +1719,7 @@ function splitFields(line){
 }
 function parseSongLine(line){
   var f = splitFields(line).map(function(x){ return x.trim(); });
-  var out = { raw: line, err: null, t: null, title: '', bpm: null, sig: 4, sigd: 4, bars: 2, note: '' };
+  var out = { raw: line, err: null, t: null, title: '', bpm: null, sig: 4, sigd: 4, bars: 4, note: '' };
 
   /* the time column is optional, and may be a placeholder */
   var timeTok = f.shift() || '';
@@ -1788,7 +1796,7 @@ function placeSongs(rows){
 }
 function songsToText(){
   return CUES.filter(function(c){ return c.kind === 'song'; }).map(function(c){
-    var f = [fmtTC(c.t), c.title, c.bpm || '', sigLabel(c), c.bars == null ? 2 : c.bars, c.note || ''];
+    var f = [fmtTC(c.t), c.title, c.bpm || '', sigLabel(c), c.bars == null ? 4 : c.bars, c.note || ''];
     while(f.length && f[f.length - 1] === '') f.pop();
     return f.join(' , ');
   }).join('\n');
