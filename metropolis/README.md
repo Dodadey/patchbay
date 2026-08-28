@@ -260,6 +260,32 @@ straight in.
 The offset is display only. Cue timings, sync points and count-ins all stay in
 film time and are untouched by it.
 
+### MARK — building a dense sheet in one pass
+
+**MARK** in the transport (or `m`) drops a cue at the playhead instantly: no
+dialog, no typing, titled with its own timecode. Every mark is also a **sync
+point**, on the reasoning that you only mark something you just recognised on
+screen.
+
+That is the fast way to fill the sheet out. Play the film, tap MARK at every
+moment you might ever want to sync to or cue from, and stop worrying about
+naming — rename the ones that matter afterwards, delete the rest. Twenty marks
+across the film puts a sync point every seven minutes; sixty puts one every two
+and a half.
+
+Density matters because syncing otherwise means waiting for the next landmark
+to come round. Which brings us to the other half:
+
+### Syncing without waiting
+
+The SYNC drawer takes a typed position as well as a tapped landmark. Read where
+your player has got to, type it into the box at the top, press GO. With a
+**PLAYER OFFSET** set the box takes your player's own numbers and converts
+them; without one it takes film time.
+
+**ALL CUES** in the SYNC header widens the list from cues flagged as landmarks
+to every cue in the sheet, marks included.
+
 ### Building the real sheet
 
 The seed sheet ships with the film's landmarks **in the right running order**

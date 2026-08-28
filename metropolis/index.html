@@ -257,6 +257,7 @@ body.stopped #clock{color:var(--faint);}
 .btn.play{background:var(--green); border-color:var(--green); color:#062012; font-weight:700; min-width:96px; justify-content:center;}
 body.running .btn.play{background:var(--panel); border-color:var(--line2); color:var(--ink); font-weight:600;}
 .btn.sync{background:#1a1206; border-color:var(--gold-dim); color:var(--gold); font-weight:700;}
+.btn.mark{background:#0c1a12; border-color:#26543c; color:var(--green); font-weight:700;}
 .btn.nudge{padding:11px 10px; color:var(--dim); min-width:52px; justify-content:center;}
 .sep{width:1px; background:var(--line); margin:2px 3px; flex:0 0 auto;}
 
@@ -551,6 +552,7 @@ code{
   <footer id="transport">
     <button class="btn play" id="btnPlay">START</button>
     <button class="btn sync" id="btnSync">SYNC</button>
+    <button class="btn mark" id="btnMark">MARK</button>
     <div class="sep"></div>
     <button class="btn nudge" data-nudge="-1">&minus;1s</button>
     <button class="btn nudge" data-nudge="-0.1">&minus;.1</button>
@@ -766,13 +768,23 @@ code{
 <div class="scrim" id="syncScrim">
   <div class="drawer">
     <div class="dhead">
-      <h2>SYNC TO A LANDMARK</h2>
+      <h2>SYNC</h2>
+      <button class="tbtn" id="syncScope">ALL CUES</button>
       <button class="tbtn" id="syncClose">CLOSE</button>
     </div>
     <div class="dbody">
+      <div class="shiftBar">
+        <span class="shiftLab" id="syncJumpLab">FILM TIME</span>
+        <input type="text" id="syncJumpTime" spellcheck="false" placeholder="1:02:33">
+        <button class="mini go" id="syncJumpGo">GO</button>
+      </div>
+      <p class="note" style="margin:0 0 14px" id="syncJumpNote">
+        Read the position off your player and type it here. No waiting for a landmark to come round.
+      </p>
       <div class="banner">
-        Tap a landmark <b>at the instant it hits the screen</b>. The clock jumps to that timecode,
-        with your tap-latency allowance taken off. Nearest landmarks to the current position are listed first.
+        Or tap a cue below <b>at the instant it hits the screen</b>. The clock jumps to that timecode,
+        less your tap-latency allowance. Nearest first. <b>ALL CUES</b> in the header widens the list
+        beyond the cues flagged as landmarks.
       </div>
       <div id="syncList"></div>
     </div>
@@ -1937,14 +1949,50 @@ function syncTo(c){
   closeScrim('syncScrim');
   toast(msg, 'good');
 }
+/* Dropping a mark is the fast way to build a dense sheet during a watch-through:
+   one tap, no dialog, and it doubles as a sync point because you only mark
+   things you just recognised on screen. */
+function markHere(){
+  var t = Math.round(filmTime() * 10) / 10;
+  var c = normaliseCue({ t: t, kind: 'cue', title: 'Mark ' + fmtTC(t), sync: true, est: false });
+  CUES.push(c);
+  sortCues(); save();
+  if($('cueScrim').classList.contains('show')) renderCueList();
+  drawTimeline(); renderOrder(); refreshChips();
+  last.next = ''; last.now = ''; last.up = '';
+  toast('Marked ' + fmtTC(t, true) + '  ·  ' + CUES.filter(function(x){ return x.sync; }).length + ' sync points', 'good');
+}
+$('btnMark').onclick = markHere;
+
+var syncShowAll = false;
+$('syncScope').onclick = function(){
+  syncShowAll = !syncShowAll;
+  $('syncScope').textContent = syncShowAll ? 'LANDMARKS ONLY' : 'ALL CUES';
+  $('syncScope').classList.toggle('active', syncShowAll);
+  renderSyncList();
+};
+$('syncJumpGo').onclick = function(){
+  var v = parseTC($('syncJumpTime').value);
+  if(v == null){ toast('Timecode not understood', 'warn'); return; }
+  var film = v - (SET.srcOffset || 0);
+  setFilmTime(film);
+  closeScrim('syncScrim');
+  if(!isRunning()) play();
+  toast('Jumped to ' + fmtTC(Math.max(0, film)));
+};
+
 function renderSyncList(){
   var box = $('syncList');
   box.innerHTML = '';
   var t = filmTime();
-  var pts = CUES.filter(function(c){ return c.sync; })
+  $('syncJumpLab').textContent = SET.srcOffset ? 'PLAYER TIME' : 'FILM TIME';
+  $('syncJumpNote').textContent = SET.srcOffset
+    ? 'Read the position off your player and type it here — the offset is applied for you. No waiting for a landmark to come round.'
+    : 'Type the position you are at and the clock jumps there. No waiting for a landmark to come round. Set a PLAYER OFFSET in SETUP and this accepts your player\u2019s own numbers instead.';
+  var pts = CUES.filter(function(c){ return syncShowAll ? c.kind !== 'act' : c.sync; })
     .sort(function(a, b){ return Math.abs(a.t - t) - Math.abs(b.t - t); });
   if(!pts.length){
-    box.appendChild(el('p', 'note', 'No cues are marked as sync points yet. Tick “usable as a sync point” on any cue with an unmistakable frame.'));
+    box.appendChild(el('p', 'note', 'Nothing to list yet. Hit MARK in the transport as the film plays and every mark lands here.'));
     return;
   }
   pts.forEach(function(c){
@@ -2293,6 +2341,7 @@ document.addEventListener('keydown', function(e){
   if(k === ' ' || k === 'spacebar'){ e.preventDefault(); toggle(); }
   else if(k === 's'){ renderSyncList(); openScrim('syncScrim'); }
   else if(k === 'c'){ $('btnClick').click(); }
+  else if(k === 'm'){ markHere(); }
   else if(k === 'f'){ $('btnFull').click(); }
   else if(k === 'e'){ renderCueList(); openScrim('cueScrim'); }
   else if(k === 'g'){ openGoto(null); }
