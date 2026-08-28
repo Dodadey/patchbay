@@ -222,6 +222,24 @@ ON** shifts only what comes after the current position, for a print that gains
 an extra title card partway through. Cues pushed below 0:00 pile up at zero and
 the app says so — that part cannot be undone by shifting back.
 
+### Working alongside an external player
+
+If the film comes from Apple TV, a projectionist's machine or anything else you
+cannot load as a file, the app free-runs and the sync points hold it to the
+picture. The one nuisance is that your player's scrubber and the app's film
+time will not read the same number, because the player counts from the start of
+its own file, lead-in and all.
+
+**SETUP → PLAYER OFFSET** settles that. Press **WORK IT OUT**, type whatever
+your player is showing at that moment, and the app works out the difference. A
+**PLAYER** readout then appears next to the film clock, so you can call out
+either number without doing arithmetic, and a **PLAYER TIME** box appears in
+**GO TO** so a position quoted off someone else's scrubber can be typed
+straight in.
+
+The offset is display only. Cue timings, sync points and count-ins all stay in
+film time and are untouched by it.
+
 ### Building the real sheet
 
 The seed sheet ships with the film's landmarks **in the right running order**

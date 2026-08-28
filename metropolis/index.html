@@ -511,6 +511,7 @@ code{
           <span>LEFT <b id="remain">2:28:00</b></span>
           <span>REEL <b id="reelPct">0%</b></span>
           <span id="offsetLine">OFFSET <b id="offsetVal">0.00s</b></span>
+          <span id="srcLine">PLAYER <b id="srcVal">0:00:00</b></span>
         </div>
       </div>
       <div class="card" id="nowCard">
@@ -791,6 +792,13 @@ code{
         <input type="text" id="gotoTime" placeholder="1:02:33" style="flex:0 0 160px">
         <button class="mini go" id="gotoJump">GO</button>
       </div>
+      <div class="frow" id="gotoSrcRow">
+        <label>PLAYER TIME</label>
+        <input type="text" id="gotoSrcTime" spellcheck="false" placeholder="1:03:03" style="flex:0 0 160px">
+        <button class="mini go" id="gotoSrcJump">GO</button>
+        <span class="hint">Type the number your player is showing and the app converts it to film
+          time for you.</span>
+      </div>
       <div class="frow">
         <label class="check" style="flex:1">
           <input type="checkbox" id="gotoRoll" checked>
@@ -846,6 +854,16 @@ code{
         <label>FILM LENGTH</label>
         <input type="text" id="setDur" placeholder="2:28:00" style="flex:0 0 140px">
         <span class="hint">Only drives the timeline scale and the remaining-time readout.</span>
+      </div>
+      <div class="frow">
+        <label>PLAYER OFFSET</label>
+        <input type="text" id="setSrcOffset" spellcheck="false" placeholder="0:30" style="flex:0 0 150px">
+        <button class="mini stamp" id="setSrcFromPlayer">WORK IT OUT</button>
+        <span class="hint">The difference between film time and whatever your player's scrubber
+          says &mdash; Apple TV, a projectionist's machine, a colleague quoting a YouTube position.
+          Set it and a <b>PLAYER</b> readout appears beside the film clock, so you can call out
+          either number without doing sums. <b>WORK IT OUT</b> asks what your player reads right
+          now and works the offset out from that.</span>
       </div>
       <div class="frow">
         <label>DEFAULT LEAD</label>
@@ -1075,6 +1093,7 @@ function defaultSettings(){
     lastVideoName: '',
     vidSize: 'docked',
     clockSource: 'video',   /* 'video' = the file drives; 'free' = it follows */
+    srcOffset: 0,           /* film time + this = what the external player shows */
     rate: 1
   };
 }
@@ -1342,6 +1361,7 @@ var ui = {
   nowTitle: $('nowTitle'), nowNote: $('nowNote'), nowMeta: $('nowMeta'),
   nextCard: $('nextCard'), nextTitle: $('nextTitle'), nextCount: $('nextCount'),
   nextNote: $('nextNote'), nextMeta: $('nextMeta'), upcoming: $('upcoming'),
+  srcVal: $('srcVal'),
   head: $('tlHead'), ci: $('countin'), ciTitle: $('ciTitle'), ciBeat: $('ciBeat'),
   ciDots: $('ciDots'), ciSub: $('ciSub'), ciLabel: $('ciLabel'), ciClock: $('ciClock')
 };
@@ -1359,6 +1379,7 @@ function render(){
     last.clock = cs + frac;
     ui.remain.textContent = fmtTC(Math.max(0, SET.dur - t));
     ui.reelPct.textContent = Math.round(clamp(t / SET.dur, 0, 1) * 100) + '%';
+    if(SET.srcOffset) ui.srcVal.textContent = fmtTC(t + SET.srcOffset);
   }
   ui.head.style.left = (clamp(t / SET.dur, 0, 1) * 100) + '%';
 
@@ -1950,6 +1971,7 @@ function gotoCue(c, roll){
   toast('From ' + fmtTC(filmTime()) + ' → ' + c.title.slice(0, 26));
 }
 function openGoto(pref){
+  $('gotoSrcRow').style.display = SET.srcOffset ? '' : 'none';
   var box = $('gotoList');
   box.innerHTML = '';
   $('gotoTime').value = fmtTC(pref ? pref.t : filmTime());
@@ -1976,6 +1998,15 @@ $('gotoJump').onclick = function(){
   setFilmTime(t);
   closeScrim('gotoScrim');
   if(!isRunning()) play();
+};
+$('gotoSrcJump').onclick = function(){
+  var t = parseTC($('gotoSrcTime').value);
+  if(t == null){ toast('Timecode not understood', 'warn'); return; }
+  var film = t - SET.srcOffset;
+  setFilmTime(film);
+  closeScrim('gotoScrim');
+  if(!isRunning()) play();
+  toast('Player ' + fmtTC(t) + '  =  film ' + fmtTC(Math.max(0, film)));
 };
 
 /* ------------------------------ transport UI --------------------------- */
@@ -2087,6 +2118,8 @@ function syncSetupForm(){
   $('setShow').value = SET.show;
   $('setVidOffset').value = SET.vidOffset;
   $('setRate').value = SET.rate.toFixed(4);
+  $('setSrcOffset').value = SET.srcOffset ? fmtTC(SET.srcOffset) : '';
+  $('gotoSrcRow').style.display = SET.srcOffset ? '' : 'none';
   $('setRateAuto').textContent = measuredRate ? 'USE ' + measuredRate.toFixed(4) : 'USE MEASURED';
   Array.prototype.forEach.call($('setClickMode').children, function(b){
     b.classList.toggle('on', b.dataset.c === SET.clickMode);
@@ -2105,6 +2138,23 @@ $('setDur').onchange = function(){
 };
 $('setLead').onchange = function(){ SET.lead = clamp(parseFloat(this.value) || 60, 1, 900); save(); last.next = ''; };
 $('setLatency').onchange = function(){ SET.latency = clamp(parseFloat(this.value) || 0, 0, 1000); save(); };
+$('setSrcOffset').onchange = function(){
+  var v = parseTC(this.value);
+  SET.srcOffset = v == null ? 0 : v;
+  save(); refreshChips(); syncSetupForm();
+};
+$('setSrcFromPlayer').onclick = function(){
+  var now = filmTime();
+  var said = prompt('What does your player show right now?\n\n' +
+    'The app is at ' + fmtTC(now) + ' film time.');
+  if(said == null) return;
+  var v = parseTC(said);
+  if(v == null){ toast('Timecode not understood', 'warn'); return; }
+  SET.srcOffset = Math.round((v - now) * 10) / 10;
+  save(); syncSetupForm(); refreshChips();
+  toast('Player runs ' + (SET.srcOffset >= 0 ? '+' : '−') + fmtShort(Math.abs(SET.srcOffset)) +
+    ' against film time', 'good');
+};
 $('setRate').onchange = function(){
   var f = filmTime();
   SET.rate = clamp(parseFloat(this.value) || 1, 0.9, 1.1);
@@ -2233,6 +2283,7 @@ function refreshChips(){
   $('chipEst').textContent = CUES.filter(function(c){ return c.est; }).length + ' EST';
   $('offsetVal').textContent = (SET.vidOffset >= 0 ? '+' : '') + SET.vidOffset.toFixed(2) + 's';
   $('offsetLine').style.display = T.hasVideo ? '' : 'none';
+  $('srcLine').style.display = SET.srcOffset ? '' : 'none';
 }
 
 /* ------------------------------ keyboard -------------------------------- */
