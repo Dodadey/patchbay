@@ -339,6 +339,47 @@ Delete the two `EXAMPLE —` cues once you have seen how a count-in behaves.
 
 ---
 
+## Four people, one sheet
+
+The app is a plain URL, so everyone in the band can open it — nothing to
+install, nothing to sign into. What is local is the *data*, not the app: each
+person gets their own sheet on their own device, and work is combined by
+passing files around rather than by a server.
+
+**Set YOUR NAME in SETUP first.** It is stamped onto anything you export, so
+when four sheets come back it is clear who put down which cue.
+
+### Songs need no app at all
+
+The song sheet's text format is the whole protocol. Anyone can type a line in a
+message, a note or an email:
+
+    1:02:33 , Moloch , 96 , 4/4 , 4 , comes in on the explosion
+
+Paste it into **CUES → SONG SHEET → ADD TO SHEET**. No film, no setup, nothing
+to install.
+
+### Marks come back as files
+
+Whoever has a copy of the film loads it, scrubs, taps **MARK** at anything
+worth catching, and sends you their **EXPORT**.
+
+**CUES → MERGE IN** folds that file into your sheet instead of replacing it.
+Cues arrive tagged with the contributor's name, shown beside the title.
+
+What it does with overlaps:
+
+- **Same title within five seconds** — a duplicate, skipped. Merging the same
+  file twice changes nothing.
+- **Same title further apart** — kept. Two songs can share a name.
+- **Different titles within two seconds** — kept, and counted in the
+  confirmation as landing near an existing cue. Two people word the same moment
+  differently, so these are flagged for you to look at rather than dropped.
+  Better a cue too many than a contribution quietly lost.
+
+**MERGE IN** never removes anything. **IMPORT** still replaces the whole sheet,
+so keep the two straight.
+
 ## Rehearsing from anywhere
 
 - **GO TO…** — type a timecode, or pick any cue. **Pre-roll** (on by default)
