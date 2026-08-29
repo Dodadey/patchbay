@@ -41,6 +41,35 @@ when the app restarts, so re-pick it each session.
 The film window sits **DOCK**ed in the left column by default, or **FLOAT**s
 where you drag it, or goes **FULL** screen behind the cue overlay.
 
+### Keeping the film in the app
+
+The film cannot ship *inside* the app — GitHub caps a single file at 100MB and
+the whole site at 1GB — but the browser will hold on to the one you pick.
+**SETUP → keep the film in the app** is on by default: pick it once and it is
+still there after a restart, with no re-picking.
+
+The line underneath reports what the browser has actually offered this app and
+how much is used. Look at that number before making your copy, because it
+varies with free space and is far more generous for an app added to the Home
+Screen than for a plain Safari tab. If the film will not fit you are told so
+plainly and the setting switches itself off; the film still plays for the rest
+of that session.
+
+**FORGET FILM** clears the stored copy. It never touches the file in Files.
+
+Sizing a copy that will fit, at 148 minutes:
+
+| video bitrate | size | |
+|---|---|---|
+| 2 Mbps | ~2.2 GB | overkill for a reference window |
+| 1 Mbps | ~1.1 GB | |
+| 700 kbps | ~780 MB | fine docked |
+| 500 kbps | ~555 MB | fine docked, 640×480 |
+
+**Strip the audio** as well — a 148-minute AAC track is around 140MB on its
+own, and it is a silent film, so there is nothing to lose and one less way for
+sound to escape mid-performance.
+
 ### Which clock, and when the window is worth having
 
 **SETUP → CLOCK SOURCE** decides what the loaded file is *for*. Get this right

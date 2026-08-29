@@ -842,6 +842,14 @@ code{
         machine and the app will free-run instead, which is what the sync points are for.
         iPadOS forgets the file on reload, so re-pick it after a restart.</p>
       <div class="frow">
+        <label class="check" style="flex:1">
+          <input type="checkbox" id="setKeepFilm" checked>
+          <span>Keep the film in the app, so it is still here after a restart</span>
+        </label>
+        <button class="mini del" id="setForgetFilm">FORGET FILM</button>
+        <span class="hint" id="storeLine"></span>
+      </div>
+      <div class="frow">
         <label>CLOCK SOURCE</label>
         <div class="seg" id="setClockSrc">
           <button data-src="video">FILE IS THE CLOCK</button>
@@ -1106,6 +1114,7 @@ function defaultSettings(){
     vidSize: 'docked',
     clockSource: 'video',   /* 'video' = the file drives; 'free' = it follows */
     srcOffset: 0,           /* film time + this = what the external player shows */
+    keepFilm: true,         /* stash the picked film so it survives a restart */
     rate: 1
   };
 }
@@ -2084,22 +2093,86 @@ $('btnClick').onclick = function(){
 };
 
 /* -------------------------------- video -------------------------------- */
+/* A feature film cannot ship with the app — GitHub caps a file at 100MB and
+   the whole site at 1GB — but the browser will hold onto the one you pick, so
+   it is there on the next launch instead of being re-picked every session. */
+var FILM_DB = 'metropolis-film', FILM_KEY = 'film';
+
+function filmDB(){
+  return new Promise(function(res, rej){
+    if(!window.indexedDB) return rej(new Error('no indexedDB'));
+    var r = indexedDB.open(FILM_DB, 1);
+    r.onupgradeneeded = function(){ r.result.createObjectStore('films'); };
+    r.onsuccess = function(){ res(r.result); };
+    r.onerror = function(){ rej(r.error); };
+  });
+}
+function filmTx(mode, fn){
+  return filmDB().then(function(db){
+    return new Promise(function(res, rej){
+      var tx = db.transaction('films', mode), st = tx.objectStore('films');
+      var req = fn(st);
+      tx.oncomplete = function(){ res(req && req.result); };
+      tx.onerror = tx.onabort = function(){ rej(tx.error || (req && req.error)); };
+    });
+  });
+}
+function filmPut(file){ return filmTx('readwrite', function(st){ return st.put(file, FILM_KEY); }); }
+function filmGet(){ return filmTx('readonly', function(st){ return st.get(FILM_KEY); }); }
+function filmDel(){ return filmTx('readwrite', function(st){ return st.delete(FILM_KEY); }); }
+
+function fmtBytes(n){
+  if(!n && n !== 0) return '—';
+  var u = ['B','KB','MB','GB'], i = 0;
+  while(n >= 1024 && i < u.length - 1){ n /= 1024; i++; }
+  return (i >= 2 ? n.toFixed(1) : Math.round(n)) + ' ' + u[i];
+}
+function showStorage(){
+  var el2 = $('storeLine');
+  if(!navigator.storage || !navigator.storage.estimate){
+    el2.textContent = 'This browser will not report how much room it has.';
+    return;
+  }
+  navigator.storage.estimate().then(function(e){
+    el2.textContent = 'Using ' + fmtBytes(e.usage) + ' of about ' + fmtBytes(e.quota) +
+      ' the browser has offered this app.';
+  }).catch(function(){ el2.textContent = ''; });
+}
+function attachFilm(file, announce){
+  if(vidURL) URL.revokeObjectURL(vidURL);
+  vidURL = URL.createObjectURL(file);
+  vid.src = vidURL;
+  T.hasVideo = true;
+  SET.lastVideoName = file.name;
+  save();
+  $('vidName').textContent = file.name;
+  setVidSize(SET.vidSize || 'docked');
+  refreshChips();
+  reflectRunning();
+  if(announce) toast(announce, 'good');
+}
+
 var vidURL = null;
 $('videoFile').addEventListener('change', function(e){
   var f = e.target.files && e.target.files[0];
   if(!f) return;
-  if(vidURL) URL.revokeObjectURL(vidURL);
-  vidURL = URL.createObjectURL(f);
-  vid.src = vidURL;
-  T.hasVideo = true;
-  SET.lastVideoName = f.name;
-  save();
-  $('vidName').textContent = f.name;
-  setVidSize(SET.vidSize || 'docked');
-  refreshChips();
-  reflectRunning();
-  toast(videoMaster() ? 'Film loaded — the video is now the clock'
-                      : 'Film loaded — it will follow the free-running clock', 'good');
+  attachFilm(f, videoMaster() ? 'Film loaded — the video is now the clock'
+                              : 'Film loaded — it will follow the free-running clock');
+  if(!SET.keepFilm) return;
+
+  toast('Keeping ' + fmtBytes(f.size) + ' in the app…');
+  var ask = (navigator.storage && navigator.storage.persist)
+    ? navigator.storage.persist().catch(function(){ return false; })
+    : Promise.resolve(false);
+  ask.then(function(){ return filmPut(f); }).then(function(){
+    showStorage();
+    toast('Film kept — it will be here next time you open the app', 'good');
+  }).catch(function(err){
+    SET.keepFilm = false; save(); syncSetupForm(); showStorage();
+    var quota = err && /quota/i.test(String(err.name || err));
+    toast(quota ? 'Too big to keep — ' + fmtBytes(f.size) + ' will not fit. Make a smaller copy.'
+                : 'Could not keep the film on this device', 'warn');
+  });
 });
 vid.addEventListener('loadedmetadata', function(){
   if(vid.duration && isFinite(vid.duration)){
@@ -2167,6 +2240,8 @@ function syncSetupForm(){
   $('setVidOffset').value = SET.vidOffset;
   $('setRate').value = SET.rate.toFixed(4);
   $('setSrcOffset').value = SET.srcOffset ? fmtTC(SET.srcOffset) : '';
+  $('setKeepFilm').checked = SET.keepFilm;
+  showStorage();
   $('gotoSrcRow').style.display = SET.srcOffset ? '' : 'none';
   $('setRateAuto').textContent = measuredRate ? 'USE ' + measuredRate.toFixed(4) : 'USE MEASURED';
   Array.prototype.forEach.call($('setClickMode').children, function(b){
@@ -2218,6 +2293,18 @@ $('setRateAuto').onclick = function(){
   toast('Clock rate set to ' + SET.rate.toFixed(4), 'good');
 };
 $('setVidOffset').onchange = function(){ SET.vidOffset = parseFloat(this.value) || 0; save(); refreshChips(); };
+$('setKeepFilm').onchange = function(){
+  SET.keepFilm = this.checked;
+  save();
+  if(!SET.keepFilm) filmDel().then(showStorage).catch(function(){});
+};
+$('setForgetFilm').onclick = function(){
+  filmDel().then(function(){
+    SET.lastVideoName = ''; save();
+    showStorage();
+    toast('Film forgotten — the file itself is untouched', 'good');
+  }).catch(function(){ toast('Nothing stored to forget', 'warn'); });
+};
 $('setVol').oninput = function(){ SET.vol = parseFloat(this.value); save(); };
 $('setWake').onchange = function(){ SET.wake = this.checked; save(); this.checked ? requestWake() : releaseWake(); refreshChips(); };
 $('setFlash').onchange = function(){ SET.flash = this.checked; save(); };
@@ -2368,6 +2455,14 @@ document.addEventListener('pointerdown', function(){
   if(SET.clickMode !== 'off') unlockAudio();
 });
 if(SET.lastVideoName) $('vidName').textContent = SET.lastVideoName + ' — re-pick in SETUP';
+
+/* If a film was kept last time, put it straight back. */
+filmGet().then(function(file){
+  if(!file || !SET.keepFilm) return;
+  attachFilm(file, null);
+  $('vidWrap').classList.add('hidden');   /* stay out of the way until asked for */
+  updateSlot();
+}).catch(function(){});
 
 if('serviceWorker' in navigator){
   window.addEventListener('load', function(){
