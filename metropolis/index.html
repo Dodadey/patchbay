@@ -625,8 +625,10 @@ code{
     <div class="dfoot">
       <button class="btn" id="cueExport">EXPORT</button>
       <button class="btn" id="cueImport">IMPORT</button>
+      <button class="btn" id="cueMerge" style="color:var(--green);border-color:#26543c">MERGE IN</button>
       <button class="btn" id="cueReset">RESET TO SEED</button>
       <input type="file" id="importFile" accept="application/json,.json" class="hide">
+      <input type="file" id="mergeFile" accept="application/json,.json" class="hide">
     </div>
   </div>
 </div>
@@ -944,6 +946,13 @@ code{
         <label>SHOW NAME</label>
         <input type="text" id="setShow" placeholder="Metropolis — live score">
       </div>
+      <div class="frow">
+        <label>YOUR NAME</label>
+        <input type="text" id="setAuthor" placeholder="Linus">
+        <span class="hint">Stamped onto anything you EXPORT, so when the four of you send sheets
+          around it is clear who put down which cue. <b>MERGE IN</b> adds someone else's cues to
+          yours instead of replacing them, skipping any that are already there.</span>
+      </div>
       <p class="note" id="verNote"></p>
     </div>
     <div class="dfoot">
@@ -1115,6 +1124,7 @@ function defaultSettings(){
     clockSource: 'video',   /* 'video' = the file drives; 'free' = it follows */
     srcOffset: 0,           /* film time + this = what the external player shows */
     keepFilm: true,         /* stash the picked film so it survives a restart */
+    author: '',             /* whose marks these are, stamped onto exports */
     rate: 1
   };
 }
@@ -1152,7 +1162,8 @@ function normaliseCue(c){
     sig: Number(c.sig) || 4,
     sigd: Number(c.sigd) || 4,
     bars: c.bars == null ? 4 : Number(c.bars),
-    lead: c.lead == null || c.lead === '' ? null : Number(c.lead)
+    lead: c.lead == null || c.lead === '' ? null : Number(c.lead),
+    by: c.by || ''
   };
 }
 var saveTimer = null;
@@ -1623,6 +1634,7 @@ function renderCueList(){
     if(c.sync) head.appendChild(el('span', null, '  ⌖'));
     if(c.bpm) head.appendChild(el('span', null, '  ♩' + c.bpm + ' ' + sigLabel(c)));
     mid.appendChild(head);
+    if(c.by) head.appendChild(el('span', null, '  · ' + c.by));
     if(c.note) mid.appendChild(el('small', null, c.note));
     row.appendChild(mid);
     var btns = el('div', 'cbtns');
@@ -2237,6 +2249,7 @@ function syncSetupForm(){
   $('setWake').checked = SET.wake;
   $('setFlash').checked = SET.flash;
   $('setShow').value = SET.show;
+  $('setAuthor').value = SET.author || '';
   $('setVidOffset').value = SET.vidOffset;
   $('setRate').value = SET.rate.toFixed(4);
   $('setSrcOffset').value = SET.srcOffset ? fmtTC(SET.srcOffset) : '';
@@ -2309,6 +2322,7 @@ $('setVol').oninput = function(){ SET.vol = parseFloat(this.value); save(); };
 $('setWake').onchange = function(){ SET.wake = this.checked; save(); this.checked ? requestWake() : releaseWake(); refreshChips(); };
 $('setFlash').onchange = function(){ SET.flash = this.checked; save(); };
 $('setShow').onchange = function(){ SET.show = this.value; save(); };
+$('setAuthor').onchange = function(){ SET.author = this.value.trim(); save(); };
 $('setTestClick').onclick = function(){ unlockAudio(); if(actx){ blip(actx.currentTime + 0.02, true); blip(actx.currentTime + 0.3, false); } };
 Array.prototype.forEach.call($('setClockSrc').children, function(b){
   b.onclick = function(){
@@ -2337,14 +2351,63 @@ function download(name, obj){
   document.body.appendChild(a); a.click();
   setTimeout(function(){ URL.revokeObjectURL(a.href); a.remove(); }, 1000);
 }
+/* Two people marking the same moment will word it differently and land a
+   second or two apart, so only a matching title close in time counts as a
+   duplicate. Anything else is added and left for a human to prune — better a
+   cue too many than someone's contribution silently dropped. */
+function normTitle(x){ return String(x || '').toLowerCase().replace(/\s+/g, ' ').trim(); }
+
+function mergeCues(incoming, who){
+  var added = 0, skipped = 0, near = 0;
+  incoming.forEach(function(raw){
+    var c = normaliseCue(raw);
+    if(who && !c.by) c.by = who;
+    var dupe = false, close = false;
+    for(var i = 0; i < CUES.length; i++){
+      var d = Math.abs(CUES[i].t - c.t);
+      if(d <= 5 && normTitle(CUES[i].title) === normTitle(c.title)){ dupe = true; break; }
+      if(d <= 2) close = true;   /* any kind — a mark landing on a song is the case that matters */
+    }
+    if(dupe){ skipped++; return; }
+    if(close) near++;
+    c.id = uid();
+    CUES.push(c);
+    added++;
+  });
+  sortCues(); save(); renderCueList(); drawTimeline(); renderOrder(); refreshChips();
+  last.next = ''; last.now = ''; last.up = '';
+  return { added: added, skipped: skipped, near: near };
+}
+
 function exportAll(){
   download('metropolis-cues-' + new Date().toISOString().slice(0, 10) + '.json',
-    { app: 'metropolis-live-cue', v: VERSION, set: SET, cues: CUES });
+    { app: 'metropolis-live-cue', v: VERSION, by: SET.author || '', set: SET, cues: CUES });
   toast('Exported', 'good');
 }
 $('cueExport').onclick = exportAll;
 $('setExportAll').onclick = exportAll;
 $('cueImport').onclick = function(){ $('importFile').click(); };
+$('cueMerge').onclick = function(){ $('mergeFile').click(); };
+$('mergeFile').addEventListener('change', function(e){
+  var f = e.target.files && e.target.files[0];
+  if(!f) return;
+  var r = new FileReader();
+  r.onload = function(){
+    try{
+      var d = JSON.parse(r.result);
+      if(!d || !Array.isArray(d.cues)) throw new Error('no cues');
+      var who = (d.by || '').trim();
+      var res = mergeCues(d.cues, who);
+      var msg = 'Merged ' + res.added + ' cue' + (res.added === 1 ? '' : 's') +
+        (who ? ' from ' + who : '');
+      if(res.skipped) msg += '  ·  ' + res.skipped + ' already here';
+      if(res.near) msg += '  ·  ' + res.near + ' land near an existing cue';
+      toast(msg, res.added ? 'good' : 'warn');
+    }catch(err){ toast('That file did not read as a cue sheet', 'warn'); }
+  };
+  r.readAsText(f);
+  e.target.value = '';
+});
 $('importFile').addEventListener('change', function(e){
   var f = e.target.files && e.target.files[0];
   if(!f) return;
