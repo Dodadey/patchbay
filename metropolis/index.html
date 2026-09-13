@@ -45,7 +45,7 @@ button{font-family:inherit; color:inherit; cursor:pointer;}
   position:fixed; inset:0;
   padding:var(--safe-t) var(--safe-r) var(--safe-b) var(--safe-l);
   display:grid;
-  grid-template-rows:auto minmax(0,1fr) auto auto auto;
+  grid-template-rows:auto auto minmax(0,1fr) auto auto auto;
   grid-template-columns:minmax(0,1fr);
   gap:0;
 }
@@ -91,9 +91,14 @@ button{font-family:inherit; color:inherit; cursor:pointer;}
 
 /* ---------- stage ---------- */
 #stage{
-  display:grid; grid-template-columns:minmax(0,1.05fr) minmax(0,1fr);
-  gap:10px; padding:10px; min-height:0;
+  display:grid; grid-template-columns:minmax(0,1.32fr) minmax(0,1fr);
+  gap:10px; padding:0 10px 8px; min-height:0;
 }
+#colFilm{min-width:0;}
+#colFilm #slotCard{flex:1 1 auto; padding:8px 10px;}
+#colFilm #slotCard.film .label{display:none;}
+/* NOW and NEXT share the right column evenly */
+#colText > .card{flex:1 1 0; min-height:0;}
 @media (orientation:portrait), (max-aspect-ratio:9/10){
   #stage{grid-template-columns:minmax(0,1fr); grid-template-rows:auto minmax(0,1fr);}
 }
@@ -109,7 +114,7 @@ button{font-family:inherit; color:inherit; cursor:pointer;}
 
 /* clock */
 #clockCard{
-  text-align:left; padding:10px 14px; flex:0 0 auto;
+  text-align:left; padding:8px 14px; margin:0 10px 8px;
   display:flex; align-items:baseline; gap:16px; flex-wrap:wrap;
 }
 #clockCard .label{margin-bottom:0;}
@@ -127,13 +132,13 @@ button{font-family:inherit; color:inherit; cursor:pointer;}
 body.stopped #clock{color:var(--faint);}
 
 /* now */
-#nowCard{flex:1 1 auto; display:flex; flex-direction:column; justify-content:center; min-height:0;}
+#nowCard{display:flex; flex-direction:column; justify-content:center; min-height:0;}
 #nowTitle{
   font-size:clamp(13px,1.6vw,19px); font-weight:600; line-height:1.25;
   color:var(--dim); word-break:break-word; letter-spacing:.01em;
 }
 #nowNote{
-  margin-top:8px; font-size:clamp(20px,3.1vw,40px); line-height:1.24;
+  margin-top:6px; font-size:clamp(18px,2.5vw,34px); line-height:1.26;
   color:var(--ink); font-weight:500; word-break:break-word;
   overflow:auto; flex:0 1 auto; min-height:0;
 }
@@ -149,8 +154,9 @@ body.stopped #clock{color:var(--faint);}
 /* slot: docked film window, or the running order when there is no film */
 #slotCard{display:flex; flex-direction:column; min-height:0; overflow:hidden;}
 #filmSlot{
-  flex:1 1 auto; min-height:0; display:none;
-  align-items:center; justify-content:flex-start;
+  flex:1 1 auto; min-height:0; min-width:0; display:none;
+  align-items:center; justify-content:center;
+  container-type:size;      /* so the picture can be sized against this box */
 }
 #slotCard.film #filmSlot{display:flex;}
 #slotCard.film #order{display:none;}
@@ -172,7 +178,7 @@ body.stopped #clock{color:var(--faint);}
 
 /* next */
 #nextCard{
-  flex:1 1 auto; justify-content:center;
+  justify-content:center;
   border-color:var(--line2);
   background:linear-gradient(180deg,var(--panel2),var(--panel));
   display:flex; flex-direction:column;
@@ -180,13 +186,12 @@ body.stopped #clock{color:var(--faint);}
 #nextCard.soon{border-color:var(--gold-dim); box-shadow:0 0 0 1px rgba(224,168,58,.18) inset;}
 #nextCard.imminent{border-color:var(--red); background:linear-gradient(180deg,#1d0e0a,var(--panel));}
 #nextTitle{
-  font-size:clamp(21px,3.4vw,38px); font-weight:700; line-height:1.08; word-break:break-word;
+  font-size:clamp(17px,2.2vw,29px); font-weight:700; line-height:1.12; word-break:break-word;
 }
 #nextCount{
   font-family:var(--mono); font-weight:600; font-variant-numeric:tabular-nums;
-  font-size:clamp(56px,10.6vw,150px); line-height:.98; margin-top:2px; color:var(--gold);
+  font-size:clamp(40px,6.4vw,92px); line-height:1; color:var(--gold);
 }
-#nextCard.imminent #nextCount{color:var(--red);}
 #nextNote{margin-top:8px; font-size:clamp(13px,1.7vw,17px); line-height:1.35; color:var(--dim);}
 #nextMeta{
   margin-top:8px; font-family:var(--mono); font-size:12px; color:var(--faint);
@@ -220,15 +225,17 @@ body.stopped #clock{color:var(--faint);}
 
 /* the band: the picture at its true shape, with the look-ahead beside it */
 #band{
-  --bandh:min(26vh,232px);
   display:flex; gap:10px;
-  padding:0 10px 8px; height:var(--bandh); min-height:0;
+  padding:0 10px 8px; height:min(19vh,168px); min-height:0;
 }
-/* Width is derived from the band height rather than from content: while the
-   browser measures intrinsic size the video's height:100% is indefinite, so it
-   falls back to its native pixel width and the card comes out far too wide. */
-#band #slotCard{flex:0 0 auto; width:calc((var(--bandh) - 16px) * 4 / 3 + 20px);}
-#band #slotCard.film .label{display:none;}   /* the filename is already on the bar */
+#countCard{
+  flex:0 0 auto; width:clamp(210px,23vw,320px);
+  display:flex; flex-direction:column; justify-content:center;
+  border-color:var(--line2); background:linear-gradient(180deg,var(--panel2),var(--panel));
+}
+#countCard.soon{border-color:var(--gold-dim);}
+#countCard.imminent{border-color:var(--red); background:linear-gradient(180deg,#1d0e0a,var(--panel));}
+#countCard.imminent #nextCount{color:var(--red);}
 #band #upcoming{flex:1 1 auto; min-width:0;}
 #band #slotCard{padding:8px 10px;}
 @media (orientation:portrait), (max-aspect-ratio:9/10){
@@ -346,11 +353,12 @@ body.running .btn.play{background:var(--panel); border-color:var(--line2); color
 #vidWrap.big{width:min(62vw,760px);}
 #vidWrap.docked{
   position:relative; right:auto; bottom:auto; left:auto; top:auto;
-  /* height-led: the picture sets its own width, so no black bars and no wasted column */
-  height:100%; width:auto; max-width:100%; display:block;
+  /* 4:3 with both maxima, so it grows to the column and shrinks on whichever side binds */
+  /* as large as fits: bounded by the slot's width, or by its height x 4/3 */
+  aspect-ratio:4/3; width:min(100%, calc(100cqh * 4 / 3)); height:auto; max-height:100%;
   box-shadow:none; border:1px solid var(--line); border-radius:8px; overflow:hidden;
 }
-#vidWrap.docked video{height:100%; width:auto; max-width:100%; display:block;}
+#vidWrap.docked video{width:100%; height:100%; object-fit:contain; display:block;}
 #vidWrap.docked #vidBar{
   position:absolute; left:0; right:0; bottom:0; cursor:default;
   background:rgba(10,12,16,.78); border-top:0;
@@ -535,9 +543,7 @@ code{
     </div>
   </header>
 
-  <main id="stage">
-    <div class="col">
-      <div class="card" id="clockCard">
+  <div class="card" id="clockCard">
         <div class="label">FILM TIME</div>
         <div id="clock">0:00:00<small>.0</small></div>
         <div id="clockSub">
@@ -546,20 +552,26 @@ code{
           <span id="offsetLine">OFFSET <b id="offsetVal">0.00s</b></span>
           <span id="srcLine">PLAYER <b id="srcVal">0:00:00</b></span>
         </div>
+  </div>
+
+  <main id="stage">
+    <div class="col" id="colFilm">
+      <div class="card" id="slotCard">
+        <div class="label" id="slotLabel">RUNNING ORDER</div>
+        <div id="filmSlot"></div>
+        <ul id="order"></ul>
       </div>
+    </div>
+    <div class="col" id="colText">
       <div class="card" id="nowCard">
         <div class="label">NOW PLAYING</div>
         <div id="nowTitle">— not started —</div>
         <div id="nowNote"></div>
         <div id="nowMeta"></div>
       </div>
-    </div>
-
-    <div class="col">
       <div class="card" id="nextCard">
         <div class="label">NEXT</div>
         <div id="nextTitle">—</div>
-        <div id="nextCount">—:—</div>
         <div id="nextNote"></div>
         <div id="nextMeta"></div>
       </div>
@@ -567,10 +579,9 @@ code{
   </main>
 
   <div id="band">
-    <div class="card" id="slotCard">
-      <div class="label" id="slotLabel">RUNNING ORDER</div>
-      <div id="filmSlot"></div>
-      <ul id="order"></ul>
+    <div class="card" id="countCard">
+      <div class="label">IN</div>
+      <div id="nextCount">—:—</div>
     </div>
     <ul id="upcoming"></ul>
   </div>
@@ -1427,6 +1438,7 @@ var ui = {
   clock: $('clock'), remain: $('remain'), reelPct: $('reelPct'), offsetVal: $('offsetVal'),
   nowTitle: $('nowTitle'), nowNote: $('nowNote'), nowMeta: $('nowMeta'),
   nextCard: $('nextCard'), nextTitle: $('nextTitle'), nextCount: $('nextCount'),
+  countCard: $('countCard'),
   nextNote: $('nextNote'), nextMeta: $('nextMeta'), upcoming: $('upcoming'),
   srcVal: $('srcVal'),
   head: $('tlHead'), ci: $('countin'), ciTitle: $('ciTitle'), ciBeat: $('ciBeat'),
@@ -1490,6 +1502,8 @@ function render(){
     ui.nextCount.textContent = away > 5940 ? fmtTC(away) : fmtShort(away);
     ui.nextCard.classList.toggle('soon', away <= lead);
     ui.nextCard.classList.toggle('imminent', away <= 10);
+    ui.countCard.classList.toggle('soon', away <= lead);
+    ui.countCard.classList.toggle('imminent', away <= 10);
   }else{
     if(last.next !== 'none'){
       last.next = 'none';
@@ -1498,6 +1512,7 @@ function render(){
       ui.nextMeta.textContent = '';
       ui.nextCount.textContent = '—';
       ui.nextCard.classList.remove('soon', 'imminent');
+      ui.countCard.classList.remove('soon', 'imminent');
     }
   }
 
