@@ -91,7 +91,7 @@ button{font-family:inherit; color:inherit; cursor:pointer;}
 
 /* ---------- stage ---------- */
 #stage{
-  display:grid; grid-template-columns:minmax(0,1.32fr) minmax(0,1fr);
+  display:grid; grid-template-columns:minmax(0,1fr) minmax(0,1.32fr);
   gap:10px; padding:0 10px 8px; min-height:0;
 }
 #colFilm{min-width:0;}
@@ -190,8 +190,9 @@ body.stopped #clock{color:var(--faint);}
 }
 #nextCount{
   font-family:var(--mono); font-weight:600; font-variant-numeric:tabular-nums;
-  font-size:clamp(40px,6.4vw,92px); line-height:1; color:var(--gold);
+  font-size:clamp(38px,5.6vw,78px); line-height:1; margin-top:2px; color:var(--gold);
 }
+#nextCard.imminent #nextCount{color:var(--red);}
 #nextNote{margin-top:8px; font-size:clamp(13px,1.7vw,17px); line-height:1.35; color:var(--dim);}
 #nextMeta{
   margin-top:8px; font-family:var(--mono); font-size:12px; color:var(--faint);
@@ -226,16 +227,9 @@ body.stopped #clock{color:var(--faint);}
 /* the band: the picture at its true shape, with the look-ahead beside it */
 #band{
   display:flex; gap:10px;
-  padding:0 10px 8px; height:min(19vh,168px); min-height:0;
+  padding:0 10px 8px; height:min(17vh,152px); min-height:0;
 }
-#countCard{
-  flex:0 0 auto; width:clamp(210px,23vw,320px);
-  display:flex; flex-direction:column; justify-content:center;
-  border-color:var(--line2); background:linear-gradient(180deg,var(--panel2),var(--panel));
-}
-#countCard.soon{border-color:var(--gold-dim);}
-#countCard.imminent{border-color:var(--red); background:linear-gradient(180deg,#1d0e0a,var(--panel));}
-#countCard.imminent #nextCount{color:var(--red);}
+#band #upcoming{flex:1 1 auto; min-width:0;}
 #band #upcoming{flex:1 1 auto; min-width:0;}
 #band #slotCard{padding:8px 10px;}
 @media (orientation:portrait), (max-aspect-ratio:9/10){
@@ -555,13 +549,6 @@ code{
   </div>
 
   <main id="stage">
-    <div class="col" id="colFilm">
-      <div class="card" id="slotCard">
-        <div class="label" id="slotLabel">RUNNING ORDER</div>
-        <div id="filmSlot"></div>
-        <ul id="order"></ul>
-      </div>
-    </div>
     <div class="col" id="colText">
       <div class="card" id="nowCard">
         <div class="label">NOW PLAYING</div>
@@ -572,17 +559,21 @@ code{
       <div class="card" id="nextCard">
         <div class="label">NEXT</div>
         <div id="nextTitle">—</div>
+        <div id="nextCount">—:—</div>
         <div id="nextNote"></div>
         <div id="nextMeta"></div>
+      </div>
+    </div>
+    <div class="col" id="colFilm">
+      <div class="card" id="slotCard">
+        <div class="label" id="slotLabel">RUNNING ORDER</div>
+        <div id="filmSlot"></div>
+        <ul id="order"></ul>
       </div>
     </div>
   </main>
 
   <div id="band">
-    <div class="card" id="countCard">
-      <div class="label">IN</div>
-      <div id="nextCount">—:—</div>
-    </div>
     <ul id="upcoming"></ul>
   </div>
 
@@ -1438,7 +1429,6 @@ var ui = {
   clock: $('clock'), remain: $('remain'), reelPct: $('reelPct'), offsetVal: $('offsetVal'),
   nowTitle: $('nowTitle'), nowNote: $('nowNote'), nowMeta: $('nowMeta'),
   nextCard: $('nextCard'), nextTitle: $('nextTitle'), nextCount: $('nextCount'),
-  countCard: $('countCard'),
   nextNote: $('nextNote'), nextMeta: $('nextMeta'), upcoming: $('upcoming'),
   srcVal: $('srcVal'),
   head: $('tlHead'), ci: $('countin'), ciTitle: $('ciTitle'), ciBeat: $('ciBeat'),
@@ -1502,8 +1492,6 @@ function render(){
     ui.nextCount.textContent = away > 5940 ? fmtTC(away) : fmtShort(away);
     ui.nextCard.classList.toggle('soon', away <= lead);
     ui.nextCard.classList.toggle('imminent', away <= 10);
-    ui.countCard.classList.toggle('soon', away <= lead);
-    ui.countCard.classList.toggle('imminent', away <= 10);
   }else{
     if(last.next !== 'none'){
       last.next = 'none';
@@ -1512,7 +1500,6 @@ function render(){
       ui.nextMeta.textContent = '';
       ui.nextCount.textContent = '—';
       ui.nextCard.classList.remove('soon', 'imminent');
-      ui.countCard.classList.remove('soon', 'imminent');
     }
   }
 
