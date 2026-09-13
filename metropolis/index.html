@@ -264,6 +264,7 @@ body.running .btn.play{background:var(--panel); border-color:var(--line2); color
 /* ---------- count-in overlay ---------- */
 #countin{
   position:fixed; inset:0; z-index:60; display:none;
+  pointer-events:none;   /* display only — never allowed to trap the transport */
   background:rgba(5,6,8,.94); backdrop-filter:blur(3px);
   flex-direction:column; align-items:center; justify-content:center;
   padding:24px; text-align:center;
@@ -1493,7 +1494,7 @@ function render(){
   }
 
   /* count-in takeover */
-  var ci = SET.flash ? activeCountIn(t) : null;
+  var ci = (SET.flash && isRunning()) ? activeCountIn(t) : null;
   if(ci){
     var cbd = beatDur(ci), csig = ci.sig || 4;
     var elapsed = t - countInStart(ci);
