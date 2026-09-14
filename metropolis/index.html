@@ -45,7 +45,7 @@ button{font-family:inherit; color:inherit; cursor:pointer;}
   position:fixed; inset:0;
   padding:var(--safe-t) var(--safe-r) var(--safe-b) var(--safe-l);
   display:grid;
-  grid-template-rows:auto minmax(0,1fr) auto auto;
+  grid-template-rows:auto auto minmax(0,1fr) auto auto auto;
   grid-template-columns:minmax(0,1fr);
   gap:0;
 }
@@ -91,9 +91,14 @@ button{font-family:inherit; color:inherit; cursor:pointer;}
 
 /* ---------- stage ---------- */
 #stage{
-  display:grid; grid-template-columns:minmax(0,1.05fr) minmax(0,1fr);
-  gap:10px; padding:10px; min-height:0;
+  display:grid; grid-template-columns:minmax(0,1fr) minmax(0,1.32fr);
+  gap:10px; padding:0 10px 8px; min-height:0;
 }
+#colFilm{min-width:0;}
+#colFilm #slotCard{flex:1 1 auto; padding:8px 10px;}
+#colFilm #slotCard.film .label{display:none;}
+/* NOW and NEXT share the right column evenly */
+#colText > .card{flex:1 1 0; min-height:0;}
 @media (orientation:portrait), (max-aspect-ratio:9/10){
   #stage{grid-template-columns:minmax(0,1fr); grid-template-rows:auto minmax(0,1fr);}
 }
@@ -108,28 +113,34 @@ button{font-family:inherit; color:inherit; cursor:pointer;}
 }
 
 /* clock */
-#clockCard{text-align:left; padding-bottom:10px;}
+#clockCard{
+  text-align:left; padding:8px 14px; margin:0 10px 8px;
+  display:flex; align-items:baseline; gap:16px; flex-wrap:wrap;
+}
+#clockCard .label{margin-bottom:0;}
 #clock{
   font-family:var(--mono); font-weight:600; font-variant-numeric:tabular-nums;
-  font-size:clamp(46px,10.4vw,116px); line-height:.94; letter-spacing:-.02em;
+  font-size:clamp(30px,4.4vw,58px); line-height:.96; letter-spacing:-.02em;
   color:var(--ink);
 }
 #clock small{font-size:.42em; color:var(--gold); font-weight:500; letter-spacing:0;}
 #clockSub{
-  display:flex; gap:14px; flex-wrap:wrap; margin-top:8px;
+  display:flex; gap:14px; flex-wrap:wrap; margin-top:0; margin-left:auto;
   font-family:var(--mono); font-size:12px; color:var(--dim); font-variant-numeric:tabular-nums;
 }
 #clockSub b{color:var(--ink); font-weight:600;}
 body.stopped #clock{color:var(--faint);}
 
 /* now */
-#nowCard{flex:0 0 auto; display:flex; flex-direction:column; min-height:0;}
+#nowCard{display:flex; flex-direction:column; justify-content:center; min-height:0;}
 #nowTitle{
-  font-size:clamp(20px,3.2vw,34px); font-weight:600; line-height:1.1;
-  color:var(--ink); word-break:break-word;
+  font-size:clamp(13px,1.6vw,19px); font-weight:600; line-height:1.25;
+  color:var(--dim); word-break:break-word; letter-spacing:.01em;
 }
 #nowNote{
-  margin-top:6px; font-size:clamp(13px,1.7vw,18px); line-height:1.35; color:var(--dim);
+  margin-top:6px; font-size:clamp(18px,2.5vw,34px); line-height:1.26;
+  color:var(--ink); font-weight:500; word-break:break-word;
+  overflow:auto; flex:0 1 auto; min-height:0;
 }
 #nowMeta{
   display:flex; gap:10px; align-items:baseline; margin-top:8px; flex-wrap:wrap;
@@ -141,8 +152,12 @@ body.stopped #clock{color:var(--faint);}
 }
 
 /* slot: docked film window, or the running order when there is no film */
-#slotCard{flex:1 1 auto; display:flex; flex-direction:column; min-height:0; overflow:hidden;}
-#filmSlot{flex:1 1 auto; min-height:0; display:none; align-items:stretch; justify-content:center;}
+#slotCard{display:flex; flex-direction:column; min-height:0; overflow:hidden;}
+#filmSlot{
+  flex:1 1 auto; min-height:0; min-width:0; display:none;
+  align-items:center; justify-content:center;
+  container-type:size;      /* so the picture can be sized against this box */
+}
 #slotCard.film #filmSlot{display:flex;}
 #slotCard.film #order{display:none;}
 #order{
@@ -163,6 +178,7 @@ body.stopped #clock{color:var(--faint);}
 
 /* next */
 #nextCard{
+  justify-content:center;
   border-color:var(--line2);
   background:linear-gradient(180deg,var(--panel2),var(--panel));
   display:flex; flex-direction:column;
@@ -170,11 +186,11 @@ body.stopped #clock{color:var(--faint);}
 #nextCard.soon{border-color:var(--gold-dim); box-shadow:0 0 0 1px rgba(224,168,58,.18) inset;}
 #nextCard.imminent{border-color:var(--red); background:linear-gradient(180deg,#1d0e0a,var(--panel));}
 #nextTitle{
-  font-size:clamp(21px,3.4vw,38px); font-weight:700; line-height:1.08; word-break:break-word;
+  font-size:clamp(17px,2.2vw,29px); font-weight:700; line-height:1.12; word-break:break-word;
 }
 #nextCount{
   font-family:var(--mono); font-weight:600; font-variant-numeric:tabular-nums;
-  font-size:clamp(38px,7.4vw,84px); line-height:1; margin-top:4px; color:var(--gold);
+  font-size:clamp(38px,5.6vw,78px); line-height:1; margin-top:2px; color:var(--gold);
 }
 #nextCard.imminent #nextCount{color:var(--red);}
 #nextNote{margin-top:8px; font-size:clamp(13px,1.7vw,17px); line-height:1.35; color:var(--dim);}
@@ -185,8 +201,8 @@ body.stopped #clock{color:var(--faint);}
 
 /* upcoming list */
 #upcoming{
-  list-style:none; margin:0; padding:0; flex:1; min-height:0; overflow:auto;
-  display:flex; flex-direction:column; gap:6px;
+  list-style:none; margin:0; padding:0; min-height:0; overflow:hidden;
+  display:flex; flex-direction:column; gap:6px; justify-content:center;
 }
 #upcoming li{
   display:flex; align-items:baseline; gap:10px;
@@ -207,6 +223,19 @@ body.stopped #clock{color:var(--faint);}
 }
 .k-song{background:var(--gold);} .k-scene{background:var(--blue);}
 .k-act{background:var(--violet);} .k-cue{background:var(--green);}
+
+/* the band: the picture at its true shape, with the look-ahead beside it */
+#band{
+  display:flex; gap:10px;
+  padding:0 10px 8px; height:min(17vh,152px); min-height:0;
+}
+#band #upcoming{flex:1 1 auto; min-width:0;}
+#band #upcoming{flex:1 1 auto; min-width:0;}
+#band #slotCard{padding:8px 10px;}
+@media (orientation:portrait), (max-aspect-ratio:9/10){
+  #band{height:auto;}
+  #band #upcoming{display:none;}
+}
 
 /* ---------- timeline ---------- */
 #timelineWrap{padding:0 10px 6px; min-width:0; overflow:hidden;}
@@ -264,6 +293,7 @@ body.running .btn.play{background:var(--panel); border-color:var(--line2); color
 /* ---------- count-in overlay ---------- */
 #countin{
   position:fixed; inset:0; z-index:60; display:none;
+  pointer-events:none;   /* display only — never allowed to trap the transport */
   background:rgba(5,6,8,.94); backdrop-filter:blur(3px);
   flex-direction:column; align-items:center; justify-content:center;
   padding:24px; text-align:center;
@@ -316,13 +346,17 @@ body.running .btn.play{background:var(--panel); border-color:var(--line2); color
 }
 #vidWrap.big{width:min(62vw,760px);}
 #vidWrap.docked{
-  position:static; width:100%; right:auto; bottom:auto; left:auto; top:auto;
-  max-height:100%; box-shadow:none; border:1px solid var(--line); border-radius:8px;
-  display:flex; flex-direction:column;
+  position:relative; right:auto; bottom:auto; left:auto; top:auto;
+  /* 4:3 with both maxima, so it grows to the column and shrinks on whichever side binds */
+  /* as large as fits: bounded by the slot's width, or by its height x 4/3 */
+  aspect-ratio:4/3; width:min(100%, calc(100cqh * 4 / 3)); height:auto; max-height:100%;
+  box-shadow:none; border:1px solid var(--line); border-radius:8px; overflow:hidden;
 }
-/* height:0 + flex-grow lets the picture shrink to the card instead of overflowing it */
-#vidWrap.docked video{flex:1 1 auto; height:0; min-height:0; width:100%; object-fit:contain;}
-#vidWrap.docked #vidBar{flex:0 0 auto; cursor:default;}
+#vidWrap.docked video{width:100%; height:100%; object-fit:contain; display:block;}
+#vidWrap.docked #vidBar{
+  position:absolute; left:0; right:0; bottom:0; cursor:default;
+  background:rgba(10,12,16,.78); border-top:0;
+}
 #vidWrap.huge{
   width:auto; right:0; left:0; top:0; bottom:0; border-radius:0; border:0;
   display:flex; flex-direction:column; justify-content:center; z-index:35;
@@ -503,9 +537,7 @@ code{
     </div>
   </header>
 
-  <main id="stage">
-    <div class="col">
-      <div class="card" id="clockCard">
+  <div class="card" id="clockCard">
         <div class="label">FILM TIME</div>
         <div id="clock">0:00:00<small>.0</small></div>
         <div id="clockSub">
@@ -514,21 +546,16 @@ code{
           <span id="offsetLine">OFFSET <b id="offsetVal">0.00s</b></span>
           <span id="srcLine">PLAYER <b id="srcVal">0:00:00</b></span>
         </div>
-      </div>
+  </div>
+
+  <main id="stage">
+    <div class="col" id="colText">
       <div class="card" id="nowCard">
         <div class="label">NOW PLAYING</div>
         <div id="nowTitle">— not started —</div>
         <div id="nowNote"></div>
         <div id="nowMeta"></div>
       </div>
-      <div class="card" id="slotCard">
-        <div class="label" id="slotLabel">RUNNING ORDER</div>
-        <div id="filmSlot"></div>
-        <ul id="order"></ul>
-      </div>
-    </div>
-
-    <div class="col">
       <div class="card" id="nextCard">
         <div class="label">NEXT</div>
         <div id="nextTitle">—</div>
@@ -536,9 +563,19 @@ code{
         <div id="nextNote"></div>
         <div id="nextMeta"></div>
       </div>
-      <ul id="upcoming"></ul>
+    </div>
+    <div class="col" id="colFilm">
+      <div class="card" id="slotCard">
+        <div class="label" id="slotLabel">RUNNING ORDER</div>
+        <div id="filmSlot"></div>
+        <ul id="order"></ul>
+      </div>
     </div>
   </main>
+
+  <div id="band">
+    <ul id="upcoming"></ul>
+  </div>
 
   <div id="timelineWrap">
     <div id="timeline">
@@ -1437,7 +1474,7 @@ function render(){
   }
 
   /* next */
-  var up = cuesAfter(t, 9);
+  var up = cuesAfter(t, 4);
   var nx = up[0];
   if(nx){
     var away = nx.t - t;
@@ -1493,7 +1530,7 @@ function render(){
   }
 
   /* count-in takeover */
-  var ci = SET.flash ? activeCountIn(t) : null;
+  var ci = (SET.flash && isRunning()) ? activeCountIn(t) : null;
   if(ci){
     var cbd = beatDur(ci), csig = ci.sig || 4;
     var elapsed = t - countInStart(ci);
