@@ -134,11 +134,11 @@ body.stopped #clock{color:var(--faint);}
 /* now */
 #nowCard{display:flex; flex-direction:column; justify-content:center; min-height:0;}
 #nowTitle{
-  font-size:clamp(13px,1.6vw,19px); font-weight:600; line-height:1.25;
+  font-size:clamp(15px,2.0vw,26px); font-weight:600; line-height:1.22;
   color:var(--dim); word-break:break-word; letter-spacing:.01em;
 }
 #nowNote{
-  margin-top:6px; font-size:clamp(18px,2.5vw,34px); line-height:1.26;
+  margin-top:6px; font-size:clamp(20px,3.0vw,42px); line-height:1.24;
   color:var(--ink); font-weight:500; word-break:break-word;
   overflow:auto; flex:0 1 auto; min-height:0;
 }
@@ -178,7 +178,7 @@ body.stopped #clock{color:var(--faint);}
 
 /* next */
 #nextCard{
-  justify-content:center;
+  justify-content:center; overflow:auto;
   border-color:var(--line2);
   background:linear-gradient(180deg,var(--panel2),var(--panel));
   display:flex; flex-direction:column;
@@ -193,7 +193,17 @@ body.stopped #clock{color:var(--faint);}
   font-size:clamp(38px,5.6vw,78px); line-height:1; margin-top:2px; color:var(--gold);
 }
 #nextCard.imminent #nextCount{color:var(--red);}
-#nextNote{margin-top:8px; font-size:clamp(13px,1.7vw,17px); line-height:1.35; color:var(--dim);}
+#nextNote{margin-top:8px; font-size:clamp(15px,1.9vw,22px); line-height:1.32; color:var(--dim);}
+/* The 14" fits the sizes above with a long title and a long note together.
+   A smaller iPad does not, and clipped cue text on stage is unacceptable, so
+   the NEXT block steps down there only. The countdown is left alone. */
+@media (max-width:1250px){
+  #nextTitle{font-size:clamp(15px,1.85vw,21px);}
+  #nextNote{font-size:clamp(13px,1.45vw,16px);}
+  #colText > .card{padding:8px 12px;}
+  #nextNote{line-height:1.26; margin-top:6px;}
+  #nextCount{font-size:clamp(34px,5.0vw,60px);}
+}
 #nextMeta{
   margin-top:8px; font-family:var(--mono); font-size:12px; color:var(--faint);
   letter-spacing:.06em;
@@ -1424,6 +1434,18 @@ function scheduleClicks(){
 }
 setInterval(scheduleClicks, 25);
 
+/* A cue note is read off a stand mid-performance, so it may never be clipped.
+   Where the text does not fit its card, step the size down until it does. */
+function fitText(el, minPx){
+  el.style.fontSize = '';
+  if(!el.textContent) return;
+  var size = parseFloat(getComputedStyle(el).fontSize), guard = 0;
+  while(el.scrollHeight > el.clientHeight + 1 && size > minPx && guard++ < 60){
+    size -= 1;
+    el.style.fontSize = size + 'px';
+  }
+}
+
 /* ------------------------------ rendering ----------------------------- */
 var ui = {
   clock: $('clock'), remain: $('remain'), reelPct: $('reelPct'), offsetVal: $('offsetVal'),
@@ -1460,6 +1482,7 @@ function render(){
     ui.nowTitle.textContent = nc ? nc.title : '— before the first cue —';
     ui.nowNote.textContent = nc ? nc.note : '';
     ui.nowNote.style.display = nc && nc.note ? '' : 'none';
+    fitText(ui.nowNote, 17);
   }
   ui.nowMeta.innerHTML = '';
   if(ac) ui.nowMeta.appendChild(el('span', null, ac.title));
@@ -1484,6 +1507,7 @@ function render(){
       ui.nextTitle.textContent = nx.title;
       ui.nextNote.textContent = nx.note;
       ui.nextNote.style.display = nx.note ? '' : 'none';
+      fitText(ui.nextNote, 13);
       var meta = 'AT ' + fmtTC(nx.t) + '  ·  ' + nx.kind.toUpperCase();
       if(nx.bpm) meta += '  ·  ♩=' + nx.bpm + ' ' + sigLabel(nx) + ' · ' + (nx.bars || 0) + ' BAR IN';
       if(nx.est) meta += '  ·  ESTIMATE';
@@ -2480,6 +2504,10 @@ function requestWake(){
   }).catch(function(){ refreshChips(); });
 }
 function releaseWake(){ if(wl){ wl.release(); wl = null; } refreshChips(); }
+window.addEventListener('resize', function(){
+  fitText(ui.nowNote, 17);
+  fitText(ui.nextNote, 13);
+});
 document.addEventListener('visibilitychange', function(){
   if(document.visibilityState === 'visible' && SET.wake && !wl) requestWake();
 });
