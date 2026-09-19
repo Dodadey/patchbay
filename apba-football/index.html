@@ -456,9 +456,21 @@ tr.tot td{font-weight:700; color:var(--amber); border-bottom:1px solid var(--lin
     <h2 id="rosterTitle">Roster</h2>
     <button class="mbtn sp" id="rosterPaste">Paste a list</button>
     <button class="mbtn" id="rosterAdd">+ Player</button>
+    <button class="mbtn" id="rosterSave">Save to library</button>
     <button class="mbtn" id="rosterClose">Done</button>
   </div>
   <div class="ovBody" id="rosterBody"></div>
+</div>
+
+<div class="ov" id="ovClubs" hidden>
+  <div class="ovHead">
+    <h2>Club library</h2>
+    <button class="mbtn sp" id="clubsPaste">Paste clubs</button>
+    <button class="mbtn" id="clubsExport">Export</button>
+    <button class="mbtn" id="clubsImport">Import</button>
+    <button class="mbtn" id="clubsClose">Close</button>
+  </div>
+  <div class="ovBody" id="clubsBody"></div>
 </div>
 
 <div class="ov" id="ovSetup" hidden>
@@ -602,14 +614,14 @@ function newGame(prev){
 }
 
 /* ------------------------------ storage ------------------------------ */
-var DB = { games: {}, order: [], current: null };
+var DB = { games: {}, order: [], current: null, clubs: {} };
 
 function loadDB(){
   try{
     var raw = localStorage.getItem(STORE_KEY);
     if(raw){
       var d = JSON.parse(raw);
-      if(d && d.games){ DB = d; DB.order = DB.order || Object.keys(d.games); }
+      if(d && d.games){ DB = d; DB.order = DB.order || Object.keys(d.games); DB.clubs = DB.clubs || {}; }
     }
   }catch(e){ /* private window, or storage refused — run from memory */ }
   if(!DB.order.length || !DB.games[DB.current]){
@@ -2210,11 +2222,30 @@ function renderSetup(){
       g.teams[t].abbr = v.toUpperCase().slice(0, 5); saveDB(); render(); renderSetup();
     });
     fld(c, 'Colour', g.teams[t].color, function(v){ g.teams[t].color = v; saveDB(); render(); }, 'color');
-    var rb = mkBtn('Roster — ' + g.teams[t].roster.length + ' players', false, function(){ openRoster(t); }, 'wide');
-    c.appendChild(rb);
+    var lib = clubArray();
+    if(lib.length){
+      fld(c, 'Load a club from the library', '', function(v){
+        if(v){ loadClubInto(v, t); renderSetup(); }
+      }, 'select', [['', '\u2014']].concat(lib.map(function(cl){
+        return [cl.key, cl.name + ' (' + cl.abbr + ')'];
+      })));
+    }
+    var btns = el('div', 'row');
+    btns.appendChild(mkBtn('Roster \u2014 ' + g.teams[t].roster.length + ' players', false,
+      function(){ openRoster(t); }, 'wide'));
+    btns.appendChild(mkBtn('Save to library', false, function(){
+      saveClubFromGame(t); renderSetup();
+    }, 'sm'));
+    c.appendChild(btns);
     cols.appendChild(c);
   });
   b.appendChild(cols);
+  var libRow = el('div', 'row');
+  libRow.style.marginTop = '10px';
+  libRow.appendChild(mkBtn('Open the club library', false, function(){
+    $('ovSetup').hidden = true; renderClubs(); $('ovClubs').hidden = false;
+  }, 'sm'));
+  b.appendChild(libRow);
 
   b.appendChild(el('h3', 'sec', 'This game'));
   var gc = el('div', 'cols');
@@ -2313,17 +2344,30 @@ function renderSetup(){
 }
 
 /* ------------------------------ rosters ------------------------------ */
-var rosterTeam = 'away', pasteOpen = false;
+var rosterRef = { kind: 'team', team: 'away' }, pasteOpen = false;
 
+/* the same editor serves a club in the library and a side of this game */
+function rosterObj(){
+  return rosterRef.kind === 'club' ? DB.clubs[rosterRef.key] : G().teams[rosterRef.team];
+}
 function openRoster(t){
-  rosterTeam = t;
+  rosterRef = { kind: 'team', team: t };
+  pasteOpen = false;
+  renderRoster();
+  $('ovRoster').hidden = false;
+}
+function openClubRoster(key){
+  rosterRef = { kind: 'club', key: key };
   pasteOpen = false;
   renderRoster();
   $('ovRoster').hidden = false;
 }
 function renderRoster(){
-  var g = G(), t = rosterTeam, b = $('rosterBody');
-  $('rosterTitle').textContent = g.teams[t].name + ' roster';
+  var b = $('rosterBody'), T = rosterObj();
+  if(!T){ $('ovRoster').hidden = true; return; }
+  $('rosterTitle').textContent = T.name + ' roster' +
+    (rosterRef.kind === 'club' ? '  (club library)' : '');
+  $('rosterSave').hidden = rosterRef.kind === 'club';
   b.textContent = '';
 
   if(pasteOpen){
@@ -2341,14 +2385,14 @@ function renderRoster(){
     r.appendChild(mkBtn('Replace the roster', false, function(){
       var list = parseRoster(ta.value);
       if(!list.length){ toast('Nothing readable in there.', 'bad'); return; }
-      g.teams[t].roster = list;
+      T.roster = list;
       pasteOpen = false; saveDB(); render(); renderRoster();
       toast(list.length + ' players in.', 'good');
     }, 'wide'));
     r.appendChild(mkBtn('Add to it', false, function(){
       var list = parseRoster(ta.value);
       if(!list.length){ toast('Nothing readable in there.', 'bad'); return; }
-      g.teams[t].roster = g.teams[t].roster.concat(list);
+      T.roster = T.roster.concat(list);
       pasteOpen = false; saveDB(); render(); renderRoster();
       toast(list.length + ' added.', 'good');
     }, 'wide'));
@@ -2372,7 +2416,7 @@ function renderRoster(){
   });
   b.appendChild(head);
 
-  g.teams[t].roster.forEach(function(p, i){
+  T.roster.forEach(function(p, i){
     var row = el('div', 'rrow');
     var n = el('input', 'rn'); n.value = p.num; n.inputMode = 'numeric';
     n.addEventListener('change', function(){ p.num = num(n.value, 0); saveDB(); render(); });
@@ -2382,7 +2426,7 @@ function renderRoster(){
     nm.addEventListener('change', function(){ p.name = nm.value; saveDB(); render(); });
     var x = el('button', 'rx', '×');
     x.addEventListener('click', function(){
-      g.teams[t].roster.splice(i, 1); saveDB(); render(); renderRoster();
+      T.roster.splice(i, 1); saveDB(); render(); renderRoster();
     });
     [n, ps, nm, x].forEach(function(e2){ row.appendChild(e2); });
     b.appendChild(row);
@@ -2448,6 +2492,152 @@ function renderGames(){
 }
 function fileName(g){
   return 'apba-' + (g.date || '') + '-' + (g.teams.away.abbr || 'vis') + '-at-' + (g.teams.home.abbr || 'home');
+}
+
+/* =========================== club library ============================ */
+/* A game holds two clubs. A league holds many, so rosters are typed once
+   here and loaded into whichever game needs them. */
+var CLUB_COLOURS = ['#4f8fd0','#d9a441','#3f7d4e','#c0503a','#8b6bb8','#3f9d9d',
+                    '#b8724a','#6f8fa8','#a8486f','#7d9440'];
+
+function clubKey(abbr, name){
+  return String(abbr || name || '').toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 6) || 'CLUB';
+}
+function clubArray(){
+  return Object.keys(DB.clubs).map(function(k){ return DB.clubs[k]; })
+    .sort(function(a, b){ return a.name < b.name ? -1 : 1; });
+}
+function saveClubFromGame(side){
+  var t = G().teams[side];
+  if(!t.roster.length){ toast('That club has nobody on it yet.', 'bad'); return; }
+  var key = clubKey(t.abbr, t.name);
+  DB.clubs[key] = { key: key, name: t.name, abbr: t.abbr, color: t.color, roster: clone(t.roster) };
+  saveDB();
+  toast(t.name + ' saved to the library.', 'good');
+}
+/* Player ids are unique within a game, so a club hands out fresh ones. */
+function loadClubInto(key, side){
+  var c = DB.clubs[key];
+  if(!c) return;
+  var t = G().teams[side];
+  t.name = c.name; t.abbr = c.abbr; t.color = c.color;
+  t.roster = c.roster.map(function(p){
+    return { id: uid('p'), num: p.num, pos: p.pos, name: p.name };
+  });
+  saveDB(); render();
+  toast(c.name + ' loaded as ' + (side === 'away' ? 'the visitors' : 'the home side') + '.', 'good');
+}
+
+/* Many clubs in one paste. A line beginning TEAM starts a new one; every
+   other line is a player, read exactly as the single-club paste reads it. */
+function parseClubs(text){
+  var clubs = [], cur = null, n = 0;
+  text.split(/\r?\n/).forEach(function(raw){
+    var l = raw.trim();
+    if(!l || l[0] === '#') return;
+    if(/^team\b[\s:,|]*/i.test(l)){
+      var rest = l.replace(/^team\b[\s:,|]*/i, '');
+      var parts = rest.split(/\s*[,|\t]\s*|\s{2,}/).filter(function(s){ return s !== ''; });
+      var name = parts[0] || 'Club';
+      var abbr = '', color = '';
+      parts.slice(1).forEach(function(p){
+        if(/^#[0-9a-f]{6}$/i.test(p)) color = p.toLowerCase();
+        else if(!abbr) abbr = p.toUpperCase().slice(0, 5);
+      });
+      cur = { key: clubKey(abbr, name), name: name,
+              abbr: abbr || clubKey(abbr, name).slice(0, 3),
+              color: color || CLUB_COLOURS[n % CLUB_COLOURS.length], roster: [] };
+      clubs.push(cur); n++;
+      return;
+    }
+    if(!cur){
+      cur = { key: 'CLUB', name: 'Club', abbr: 'CLB',
+              color: CLUB_COLOURS[0], roster: [] };
+      clubs.push(cur); n++;
+    }
+    var pl = parseRoster(l);
+    if(pl.length) cur.roster.push(pl[0]);
+  });
+  return clubs.filter(function(c){ return c.roster.length; });
+}
+
+var clubsPasteOpen = false;
+
+function renderClubs(){
+  var b = $('clubsBody');
+  b.textContent = '';
+
+  if(clubsPasteOpen){
+    b.appendChild(el('h3', 'sec', 'Paste one club or the whole league'));
+    var note = el('div', 'note');
+    note.innerHTML =
+      'A line beginning <b>TEAM</b> starts a club — its name, then an abbreviation, ' +
+      'then a colour if you want one. Every line after it is a player, read the same way as a ' +
+      'single roster: number, position, name. Commas, tabs, bars or runs of spaces all separate. ' +
+      'Lines starting with # are ignored.';
+    b.appendChild(note);
+    var f = el('div', 'field');
+    var ta = el('textarea');
+    ta.style.minHeight = '260px';
+    ta.placeholder =
+      'TEAM , Seattle Seahawks , SEA , #0c2340\n' +
+      '3  , QB , Russell Wilson\n' +
+      '32 , RB , Chris Carson\n' +
+      '14 , WR , DK Metcalf\n' +
+      '\n' +
+      'TEAM , Buffalo Bills , BUF , #00338d\n' +
+      '17 , QB , Josh Allen\n' +
+      '14 , WR , Stefon Diggs';
+    f.appendChild(ta);
+    b.appendChild(f);
+    var r = el('div', 'row');
+    r.appendChild(mkBtn('Add to the library', false, function(){
+      var list = parseClubs(ta.value);
+      if(!list.length){ toast('No clubs found in that.', 'bad'); return; }
+      var added = 0, updated = 0;
+      list.forEach(function(c){
+        if(DB.clubs[c.key]) updated++; else added++;
+        DB.clubs[c.key] = c;
+      });
+      clubsPasteOpen = false;
+      saveDB(); renderClubs();
+      toast(added + ' club' + (added === 1 ? '' : 's') + ' added' +
+        (updated ? ', ' + updated + ' replaced' : '') + '.', 'good');
+    }, 'wide'));
+    r.appendChild(mkBtn('Cancel', false, function(){ clubsPasteOpen = false; renderClubs(); }, 'sm'));
+    b.appendChild(r);
+    return;
+  }
+
+  var list = clubArray();
+  if(!list.length){
+    b.appendChild(el('div', 'note',
+      'Nothing saved yet. Type a roster up in a game and use Save to the library, ' +
+      'or Paste clubs to put a whole league in at once.'));
+    return;
+  }
+  b.appendChild(el('div', 'note',
+    'Clubs kept on this iPad, ready to drop into any game. Loading one replaces that side of ' +
+    'the current game — its name, colour and whole roster.'));
+  list.forEach(function(c){
+    var card = el('div', 'gcard');
+    var swatch = el('div');
+    swatch.style.cssText = 'flex:0 0 10px; align-self:stretch; border-radius:3px; background:' + c.color;
+    card.appendChild(swatch);
+    var m = el('div', 'gm');
+    m.appendChild(el('b', null, c.name));
+    m.appendChild(el('span', null, c.abbr + '  ·  ' + c.roster.length + ' players'));
+    card.appendChild(m);
+    card.appendChild(mkBtn('Visitors', false, function(){ loadClubInto(c.key, 'away'); renderClubs(); }, 'sm'));
+    card.appendChild(mkBtn('Home', false, function(){ loadClubInto(c.key, 'home'); renderClubs(); }, 'sm'));
+    card.appendChild(mkBtn('Roster', false, function(){ openClubRoster(c.key); }, 'sm'));
+    card.appendChild(mkBtn('\u00d7', false, function(){
+      if(!confirm('Remove ' + c.name + ' from the library? Games already played keep their own copy.')) return;
+      delete DB.clubs[c.key];
+      saveDB(); renderClubs();
+    }, 'sm'));
+    b.appendChild(card);
+  });
 }
 
 /* =========================== season totals =========================== */
@@ -2670,7 +2860,8 @@ function renderMenu(){
     ['Box score', function(){ $('ovMenu').hidden = true; renderBox(); }],
     ['Drive chart', function(){ $('ovMenu').hidden = true; renderDrives(); }],
     ['Season totals', function(){ $('ovMenu').hidden = true; renderSeason(); }],
-    ['Games on this iPad', function(){ $('ovMenu').hidden = true; renderGames(); $('ovGames').hidden = false; }]
+    ['Games on this iPad', function(){ $('ovMenu').hidden = true; renderGames(); $('ovGames').hidden = false; }],
+    ['Club library', function(){ $('ovMenu').hidden = true; renderClubs(); $('ovClubs').hidden = false; }]
   ];
   var grid = el('div', 'row');
   items.forEach(function(it){
@@ -2782,6 +2973,36 @@ function importGame(text){
   toast('Imported ' + o.teams.away.abbr + ' at ' + o.teams.home.abbr + '.', 'good');
 }
 
+var fileMode = 'game';
+
+function importClubs(text){
+  var o;
+  try{ o = JSON.parse(text); }
+  catch(e){ toast('That is not a club file.', 'bad'); return; }
+  var map = o && o.clubs ? o.clubs : o;
+  if(Array.isArray(map)){
+    var byKey = {};
+    map.forEach(function(c){ if(c && c.roster) byKey[c.key || clubKey(c.abbr, c.name)] = c; });
+    map = byKey;
+  }
+  if(!map || typeof map !== 'object'){ toast('No clubs in that file.', 'bad'); return; }
+  var n = 0;
+  Object.keys(map).forEach(function(k){
+    var c = map[k];
+    if(!c || !Array.isArray(c.roster)) return;
+    var key = c.key || clubKey(c.abbr, c.name);
+    DB.clubs[key] = {
+      key: key, name: c.name || key, abbr: c.abbr || key.slice(0, 3),
+      color: c.color || CLUB_COLOURS[n % CLUB_COLOURS.length], roster: c.roster
+    };
+    n++;
+  });
+  if(!n){ toast('No clubs in that file.', 'bad'); return; }
+  saveDB(); renderClubs();
+  $('ovClubs').hidden = false;
+  toast(n + ' club' + (n === 1 ? '' : 's') + ' in.', 'good');
+}
+
 function wire(){
   $('commit').addEventListener('click', commitPad);
   $('btnUndo').addEventListener('click', undo);
@@ -2796,6 +3017,7 @@ function wire(){
 
   [['boxClose','ovBox'],['drivesClose','ovDrives'],['menuClose','ovMenu'],
    ['rosterClose','ovRoster'],['setupClose','ovSetup'],['gamesClose','ovGames'],
+   ['clubsClose','ovClubs'],
    ['seasonClose','ovSeason'],['editClose','ovEdit']].forEach(function(p){
     $(p[0]).addEventListener('click', function(){ $(p[1]).hidden = true; render(); });
   });
@@ -2805,23 +3027,40 @@ function wire(){
   });
   $('seasonText').addEventListener('click', function(){ copyOut(seasonText()); });
   $('rosterAdd').addEventListener('click', function(){
-    G().teams[rosterTeam].roster.push({ id: uid('p'), num: 0, pos: '—', name: '' });
+    var T = rosterObj();
+    if(!T) return;
+    T.roster.push({ id: uid('p'), num: 0, pos: '—', name: '' });
     saveDB(); renderRoster();
   });
   $('rosterPaste').addEventListener('click', function(){ pasteOpen = !pasteOpen; renderRoster(); });
+  $('rosterSave').addEventListener('click', function(){
+    if(rosterRef.kind === 'team') saveClubFromGame(rosterRef.team);
+  });
+  $('clubsPaste').addEventListener('click', function(){ clubsPasteOpen = !clubsPasteOpen; renderClubs(); });
+  $('clubsExport').addEventListener('click', function(){
+    var list = clubArray();
+    if(!list.length){ toast('The library is empty.', 'bad'); return; }
+    download('apba-clubs.json', JSON.stringify({ clubs: DB.clubs }, null, 1));
+  });
+  $('clubsImport').addEventListener('click', function(){ fileMode = 'clubs'; $('fileIn').click(); });
   $('gamesNew').addEventListener('click', function(){
     var ng = newGame(G());
     DB.games[ng.id] = ng; DB.order.unshift(ng.id); DB.current = ng.id;
     saveDB(); render(); renderGames();
   });
-  $('gamesImport').addEventListener('click', function(){ $('fileIn').click(); });
+  $('gamesImport').addEventListener('click', function(){ fileMode = 'game'; $('fileIn').click(); });
   $('fileIn').addEventListener('change', function(e){
     var f = e.target.files[0];
     if(!f) return;
+    var mode = fileMode;
     var rd = new FileReader();
-    rd.onload = function(){ importGame(String(rd.result)); };
+    rd.onload = function(){
+      if(mode === 'clubs') importClubs(String(rd.result));
+      else importGame(String(rd.result));
+    };
     rd.readAsText(f);
     e.target.value = '';
+    fileMode = 'game';
   });
 
   /* the dice, read the APBA way: white die first, red second */
@@ -2844,7 +3083,7 @@ function wire(){
   document.addEventListener('keydown', function(e){
     if(/^(INPUT|TEXTAREA|SELECT)$/.test(e.target.tagName)) return;
     if(e.key === 'Escape'){
-      ['ovBox','ovDrives','ovMenu','ovRoster','ovSetup','ovGames','ovSeason','ovEdit']
+      ['ovBox','ovDrives','ovMenu','ovRoster','ovSetup','ovGames','ovSeason','ovEdit','ovClubs']
         .forEach(function(id){ $(id).hidden = true; });
       render();
     }
