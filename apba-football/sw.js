@@ -2,8 +2,9 @@
    The game gets played at a table, often nowhere near wifi, so the whole
    app is cached on first load and served from cache thereafter.
    Bump CACHE to ship an update. */
-var CACHE = 'apba-football-scorekeeper-v1';
-var SHELL = ['./', './index.html', './manifest.webmanifest', './icon.svg'];
+var CACHE = 'apba-football-scorekeeper-v2';
+var SHELL = ['./', './index.html', './manifest.webmanifest', './icon.svg',
+             './clubs/nfl-2020.json'];
 
 self.addEventListener('install', function(e){
   e.waitUntil(caches.open(CACHE).then(function(c){ return c.addAll(SHELL); }).then(function(){

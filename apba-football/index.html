@@ -1494,6 +1494,21 @@ function renderLog(g, D){
 /* ============================== the pad =============================== */
 var padOpen = {};                 /* which "show the whole roster" chips are open */
 
+/* Which positions each chip row offers first. Real rosters use finer codes
+   than the starting skeleton does (FS and SS as well as S, ILB and OLB as
+   well as LB), so every spelling a league might use is listed. */
+var POS = {
+  carry: ['RB','FB','QB','WR','TE'],
+  pass:  ['QB'],
+  cat:   ['WR','TE','RB','FB'],
+  kick:  ['K'],
+  punt:  ['P','K'],
+  ret:   ['WR','RB','TE','CB','S','DB','FS','SS'],
+  def:   ['DE','DT','NT','DL','EDGE','LB','ILB','OLB','MLB','CB','S','FS','SS','DB'],
+  any:   ['QB','RB','FB','WR','TE','C','G','T','OL','LS','K','P',
+          'DE','DT','NT','DL','EDGE','LB','ILB','OLB','MLB','CB','S','FS','SS','DB']
+};
+
 function mkBtn(txt, on, fn, cls){
   var b = el('button', 'btn' + (cls ? ' ' + cls : '') + (on ? ' on' : ''), txt);
   b.addEventListener('click', fn);
@@ -1513,22 +1528,44 @@ function chipFor(team, pl, on, fn){
   c.addEventListener('click', fn);
   return c;
 }
-/* a row of player chips, filtered to the positions that usually do this */
+/* A row of player chips, filtered to the positions that usually do this and
+   ordered the way you would look for them — receivers before backs on a pass,
+   linemen before backs on a sack. A real 60-man roster would otherwise push
+   the yardage off the screen, so the first view is capped and "+ all" opens
+   the rest. */
+var CHIP_CAP = 12;
+
 function mkPlayers(host, label, team, key, positions){
   var g = G();
   var grp = mkGrp(label + ' — ' + g.teams[team].abbr);
   var all = padOpen[key];
+  var rank = {};
+  positions.forEach(function(p, i){ rank[p] = i; });
   var list = roster(team).filter(function(p){
-    return all || positions.indexOf(p.pos.toUpperCase()) >= 0;
+    return all || rank[p.pos.toUpperCase()] != null;
   });
-  if(!list.length) list = roster(team);
-  list.forEach(function(pl){
+  if(!list.length) list = roster(team).slice();
+  if(!all){
+    list = list.slice().sort(function(a, b){
+      var ra = rank[a.pos.toUpperCase()], rb = rank[b.pos.toUpperCase()];
+      if(ra !== rb) return ra - rb;
+      return (a.num || 0) - (b.num || 0);
+    });
+  }
+  /* whoever is already picked stays on screen even if the cap would drop them */
+  var shown = all ? list : list.slice(0, CHIP_CAP);
+  if(!all && pad[key] && shown.indexOf(player(team, pad[key])) < 0){
+    var sel = player(team, pad[key]);
+    if(sel) shown = [sel].concat(shown.slice(0, CHIP_CAP - 1));
+  }
+  shown.forEach(function(pl){
     grp.r.appendChild(chipFor(team, pl, pad[key] === pl.id, function(){
       pad[key] = pad[key] === pl.id ? null : pl.id;
       renderPadCtx();
     }));
   });
-  var more = el('button', 'chip', all ? '− fewer' : '+ all');
+  var hidden = list.length - shown.length;
+  var more = el('button', 'chip', all ? '\u2212 fewer' : (hidden > 0 ? '+ ' + hidden + ' more' : '+ all'));
   more.addEventListener('click', function(){ padOpen[key] = !all; renderPadCtx(); });
   grp.r.appendChild(more);
   host.appendChild(grp.d);
@@ -1625,11 +1662,11 @@ function setType(t){
   case 'pass':  pad.passer = firstAt(off, ['QB']); pad.complete = true; pad.yards = 0; break;
   case 'sack':  pad.passer = firstAt(off, ['QB']); pad.yards = -7; break;
   case 'punt':  pad.punter = firstAt(off, ['P','K']); pad.gross = 42;
-                pad.returner = firstAt(def, ['WR','CB','RB']); pad.fairCatch = true; break;
+                pad.returner = firstAt(def, POS.ret); pad.fairCatch = true; break;
   case 'fg':    pad.kicker = firstAt(off, ['K']); pad.dist = (100 - st.yard) + 17; pad.good = true; break;
   case 'ko':    pad.kicker = firstAt(st.kickTeam, ['K']); pad.touchback = true;
                 pad.catchAt = 5; pad.toYard = 25;
-                pad.returner = firstAt(other(st.kickTeam), ['WR','RB','CB']); break;
+                pad.returner = firstAt(other(st.kickTeam), POS.ret); break;
   case 'xp':    pad.kicker = firstAt(st.patTeam, ['K']); pad.good = true; break;
   case 'two':   pad.good = true; break;
   case 'pen':   pad.on = 'd'; pad.yards = 5; break;
@@ -1719,7 +1756,7 @@ function renderPadCtx(){
       host.appendChild(og.d);
       mkYards(host, 'Recovered on their own', 'spot', 48);
     }else if(!pad.touchback){
-      mkPlayers(host, 'Returner', recv, 'returner', ['WR','RB','CB','S']);
+      mkPlayers(host, 'Returner', recv, 'returner', POS.ret);
       mkYards(host, 'Caught on their own', 'catchAt', 5);
       mkYards(host, 'Returned to their own', 'toYard', 25);
       mkToggle(host, [
@@ -1751,7 +1788,7 @@ function renderPadCtx(){
       host.appendChild(bg.d);
       mkYards(host, 'Recovered on ' + g.teams[off].abbr + ' own', 'spot', st.yard);
     }else if(!pad.touchback && !pad.fairCatch && !pad.downed){
-      mkPlayers(host, 'Returner', def, 'returner', ['WR','RB','CB','S']);
+      mkPlayers(host, 'Returner', def, 'returner', POS.ret);
       mkYards(host, 'Return yards', 'retYards', 0);
       mkToggle(host, [
         ['_td','Return TD','good'],
@@ -1799,7 +1836,7 @@ function renderPadCtx(){
   }
 
   case 'run': case 'kneel': {
-    mkPlayers(host, 'Ball carrier', off, 'rusher', ['RB','FB','QB','WR','TE']);
+    mkPlayers(host, 'Ball carrier', off, 'rusher', POS.carry);
     mkYards(host, 'Yards gained', 'yards', 0);
     mkToggle(host, [
       ['oob','Out of bounds'],
@@ -1808,7 +1845,7 @@ function renderPadCtx(){
     ]);
     pad.result = pad._fum ? 'fumlost' : null;
     if(pad._fum){
-      mkPlayers(host, 'Recovered by', def, 'defender', ['LB','CB','S','DE','DT']);
+      mkPlayers(host, 'Recovered by', def, 'defender', POS.def);
       mkYards(host, 'Return yards', 'retYards', 0);
     }
     break;
@@ -1829,11 +1866,11 @@ function renderPadCtx(){
     host.appendChild(cg.d);
     if(pad._int){
       pad.result = 'int';
-      mkPlayers(host, 'Intercepted by', def, 'defender', ['CB','S','LB','DE']);
+      mkPlayers(host, 'Intercepted by', def, 'defender', POS.def);
       mkYards(host, 'Picked off, yards past the line', 'yards', 8);
       mkYards(host, 'Return yards', 'retYards', 0);
     }else{
-      mkPlayers(host, 'Receiver', off, 'receiver', ['WR','TE','RB','FB']);
+      mkPlayers(host, 'Receiver', off, 'receiver', POS.cat);
       if(pad.complete){
         mkYards(host, 'Yards gained', 'yards', 0);
         mkToggle(host, [
@@ -1842,7 +1879,7 @@ function renderPadCtx(){
         ]);
         pad.result = pad._fum ? 'fumlost' : null;
         if(pad._fum){
-          mkPlayers(host, 'Recovered by', def, 'defender', ['LB','CB','S','DE','DT']);
+          mkPlayers(host, 'Recovered by', def, 'defender', POS.def);
           mkYards(host, 'Return yards', 'retYards', 0);
         }
       }else{
@@ -1854,7 +1891,7 @@ function renderPadCtx(){
 
   case 'sack': {
     mkPlayers(host, 'Quarterback', off, 'passer', ['QB']);
-    mkPlayers(host, 'Sacked by', def, 'defender', ['DE','DT','LB','S','CB']);
+    mkPlayers(host, 'Sacked by', def, 'defender', POS.def);
     mkYards(host, 'Yards lost', 'yards', -7);
     mkToggle(host, [['_fum','Fumble LOST','danger']]);
     pad.result = pad._fum ? 'fumlost' : null;
@@ -1897,7 +1934,7 @@ function renderPadCtx(){
     ni.addEventListener('input', function(){ pad.name = ni.value; });
     ng.r.appendChild(ni);
     host.appendChild(ng.d);
-    mkPlayers(host, 'On', pad.on === 'o' ? off : def, 'player', ['QB','RB','WR','TE','LB','CB','S','DE','DT','FB']);
+    mkPlayers(host, 'On', pad.on === 'o' ? off : def, 'player', POS.any);
     break;
   }
 
@@ -2563,6 +2600,26 @@ function parseClubs(text){
 
 var clubsPasteOpen = false;
 
+/* A season shipped alongside the app. Same origin, so the service worker
+   has it cached and this works with the wifi off. */
+function loadSeason(name){
+  toast('Loading\u2026');
+  fetch('clubs/' + name + '.json', { cache: 'no-cache' }).then(function(r){
+    if(!r.ok) throw new Error('not found');
+    return r.json();
+  }).then(function(doc){
+    var clubs = doc && doc.clubs;
+    if(!clubs) throw new Error('no clubs in it');
+    var n = 0;
+    Object.keys(clubs).forEach(function(k){ DB.clubs[k] = clubs[k]; n++; });
+    saveDB(); renderClubs();
+    toast(n + ' clubs loaded' + (doc.season ? ' \u2014 ' + doc.season + ' season' : '') + '.', 'good');
+  }).catch(function(){
+    toast('Could not read that season file. Opening the app from a folder rather ' +
+          'than a web address will do this.', 'bad');
+  });
+}
+
 function renderClubs(){
   var b = $('clubsBody');
   b.textContent = '';
@@ -2609,11 +2666,16 @@ function renderClubs(){
     return;
   }
 
+  var seasons = el('div', 'row');
+  seasons.style.marginBottom = '14px';
+  seasons.appendChild(mkBtn('Load the 2020 NFL clubs', false, function(){ loadSeason('nfl-2020'); }, 'sm'));
+  b.appendChild(seasons);
+
   var list = clubArray();
   if(!list.length){
     b.appendChild(el('div', 'note',
-      'Nothing saved yet. Type a roster up in a game and use Save to the library, ' +
-      'or Paste clubs to put a whole league in at once.'));
+      'Nothing saved yet. Load a season above, type a roster up in a game and use ' +
+      'Save to the library, or Paste clubs to put a whole league in at once.'));
     return;
   }
   b.appendChild(el('div', 'note',

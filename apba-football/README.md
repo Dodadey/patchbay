@@ -196,6 +196,30 @@ A club in the library is a copy. Edit it there and games already played keep
 the roster they were played with, which is what you want — a box score should
 not change because somebody got traded in March.
 
+### The 2020 season, already in
+
+**Load the 2020 NFL clubs** in the club library puts all 32 clubs in at once —
+1,986 players with their real shirt numbers and positions, ready to play.
+
+Two things to know about it:
+
+- These are the **real 2020 NFL rosters, not an APBA card set.** The names,
+  numbers and positions are right; which players APBA printed cards for that
+  season is a separate question, so expect men in the app with no card, and
+  check your own set for anyone missing.
+- It is everyone who was **active or on reserve** during the season, so around
+  sixty per club. Practice-squad-only and released players are left out.
+
+Both are easily fixed by hand: open the club's roster and delete whoever you do
+not want. It is your library.
+
+The player chips in the pad cope with rosters this size by showing the ones who
+usually do the job first — receivers before backs on a pass, linemen before
+backs on a sack — and hiding the tail behind **+ n more**.
+
+Roster data from [nflverse](https://github.com/nflverse/nflverse-data),
+used under [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/).
+
 ### Putting a whole league in at once
 
 **Paste clubs** takes any number of clubs in one go. A line beginning **TEAM**
@@ -289,6 +313,7 @@ totals**, the way the league books have always done it.
 ## Files
 
     index.html            the entire app
+    clubs/nfl-2020.json   the 2020 rosters, loadable from the club library
     sw.js                 offline cache — bump CACHE to ship an update
     manifest.webmanifest  home-screen install
     icon.svg
