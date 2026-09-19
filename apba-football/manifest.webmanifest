@@ -1,0 +1,20 @@
+{
+  "name": "APBA Football — Scorekeeper",
+  "short_name": "APBA FB",
+  "description": "Score, chains and a full box score for the APBA Pro Football board game.",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "display_override": ["fullscreen", "standalone"],
+  "orientation": "any",
+  "background_color": "#0a0f0c",
+  "theme_color": "#0a0f0c",
+  "icons": [
+    {
+      "src": "icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}

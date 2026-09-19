@@ -1,0 +1,2872 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, user-scalable=no">
+<title>APBA Football — Scorekeeper</title>
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="APBA FB">
+<meta name="theme-color" content="#0a0f0c">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 40 40'%3E%3Crect width='40' height='40' rx='8' fill='%230a0f0c'/%3E%3Cellipse cx='20' cy='20' rx='11' ry='7' fill='none' stroke='%23e8a33d' stroke-width='2.4'/%3E%3Cpath d='M14 20h12M18 17.6v4.8M22 17.6v4.8' stroke='%23e8a33d' stroke-width='2' stroke-linecap='round'/%3E%3C/svg%3E">
+<style>
+:root{
+  /* evening game, under the lights: a green-biased dark ground, chalk on turf */
+  --bg:#0a0f0c; --bg2:#0d1410;
+  --panel:#111814; --panel2:#151d18; --raised:#1b241e; --raised2:#222d26;
+  --line:#242f28; --line2:#33403a;
+  --ink:#f1f4ee; --dim:#8d9a92; --faint:#5a6862;
+  --turf:#2e5c3a; --turf2:#24462d;
+  --amber:#e8a33d; --amber-dim:#8a6224;
+  --red:#d4452e; --green:#57c07a; --blue:#4f8fd0; --violet:#9b7fe0;
+  --los:#3f7fd6;      /* the blue line of scrimmage, as on television */
+  --marker:#f2c53d;   /* and the yellow line to gain */
+  --away:#4f8fd0; --home:#d9a441;
+  --shadow:rgba(0,0,0,.6);
+  --safe-t:env(safe-area-inset-top,0px);
+  --safe-b:env(safe-area-inset-bottom,0px);
+  --safe-l:env(safe-area-inset-left,0px);
+  --safe-r:env(safe-area-inset-right,0px);
+  --sans:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+  --mono:ui-monospace,"SF Mono",SFMono-Regular,Menlo,Consolas,"Roboto Mono",monospace;
+  /* iPadOS ships a real condensed bold; the scoreboard wants it */
+  --board:"HelveticaNeue-CondensedBold","Helvetica Neue Condensed Bold","Arial Narrow Bold","Arial Narrow",Impact,var(--sans);
+}
+*{box-sizing:border-box; -webkit-tap-highlight-color:transparent;}
+html,body{height:100%;}
+body{
+  margin:0; background:var(--bg); color:var(--ink);
+  font-family:var(--sans); font-size:15px;
+  overflow:hidden; overscroll-behavior:none;
+  -webkit-user-select:none; user-select:none; -webkit-text-size-adjust:100%;
+}
+input,textarea,select{-webkit-user-select:text; user-select:text; font-family:inherit;}
+button{font-family:inherit; color:inherit;}
+:focus-visible{outline:2px solid var(--amber); outline-offset:2px;}
+.num{font-variant-numeric:tabular-nums;}
+
+/* ------------------------------- shell ------------------------------- */
+#app{
+  height:100%; display:flex; flex-direction:column;
+  padding:var(--safe-t) var(--safe-r) var(--safe-b) var(--safe-l);
+}
+
+/* ---------------------------- scoreboard ----------------------------- */
+#board{
+  flex:0 0 auto; display:flex; align-items:stretch; gap:2px;
+  background:#050807; border-bottom:1px solid var(--line);
+}
+.side{
+  flex:1 1 0; min-width:0; display:flex; align-items:center; gap:10px;
+  padding:8px 12px; background:var(--panel); position:relative; cursor:pointer;
+}
+.side.home{flex-direction:row-reverse; text-align:right;}
+.side::after{content:""; position:absolute; left:0; right:0; bottom:0; height:3px; background:var(--tc);}
+.side .abbr{
+  font-family:var(--board); font-size:26px; letter-spacing:.5px; line-height:1;
+  color:var(--tc); white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
+}
+.side .pts{
+  font-family:var(--board); font-size:54px; line-height:.86; letter-spacing:-1px;
+  font-variant-numeric:tabular-nums; margin-left:auto;
+}
+.side.home .pts{margin-left:0; margin-right:auto;}
+.side .meta{display:flex; flex-direction:column; gap:3px; min-width:0;}
+.tos{display:flex; gap:3px;}
+.side.home .tos{justify-content:flex-end;}
+.to{width:13px; height:4px; border-radius:2px; background:var(--line2);}
+.to.on{background:var(--ink);}
+.ball{
+  width:12px; height:8px; border-radius:50%/50%; background:var(--amber);
+  box-shadow:0 0 7px var(--amber); flex:0 0 auto; opacity:0; transition:opacity .15s;
+}
+.side.poss .ball{opacity:1;}
+#centre{
+  flex:0 0 auto; display:flex; align-items:center; gap:0;
+  background:#050807;
+}
+.cell{padding:7px 14px; text-align:center; min-width:96px;}
+.cell .k{font-size:9.5px; letter-spacing:1.4px; color:var(--faint); text-transform:uppercase;}
+.cell .v{font-family:var(--board); font-size:30px; line-height:1.05; font-variant-numeric:tabular-nums;}
+.cell .v.sm{font-size:21px; line-height:1.4;}
+#cellDD .v{color:var(--amber);}
+#cellClock.expired .v{color:var(--red);}
+#menu{display:flex; flex-direction:column; justify-content:center; gap:3px; padding:5px 6px; background:var(--panel);}
+.mbtn{
+  background:var(--raised); border:1px solid var(--line2); border-radius:6px;
+  font-size:10px; letter-spacing:1px; padding:5px 9px; text-transform:uppercase;
+  white-space:nowrap;
+}
+.mbtn:active{background:var(--raised2);}
+
+/* ------------------------------ body -------------------------------- */
+#body{flex:1 1 auto; display:flex; min-height:0;}
+#left{flex:1 1 auto; display:flex; flex-direction:column; min-width:0; min-height:0;}
+#right{
+  flex:0 0 clamp(330px, 42%, 480px); min-height:0; display:flex; flex-direction:column;
+  border-left:1px solid var(--line); background:var(--panel2);
+}
+
+/* ------------------------------ field -------------------------------- */
+#fieldWrap{flex:0 0 auto; padding:10px 12px 6px;}
+#field{
+  position:relative; height:74px; border-radius:4px; overflow:hidden;
+  background:linear-gradient(180deg,#2f5f3c,#24482e);
+  border:1px solid #14261a;
+}
+.ez{position:absolute; top:0; bottom:0; width:10%; display:flex; align-items:center; justify-content:center;}
+.ez.l{left:0;} .ez.r{right:0;}
+.ez span{
+  font-family:var(--board); font-size:13px; letter-spacing:1px; color:rgba(255,255,255,.9);
+  writing-mode:vertical-rl; text-orientation:mixed;
+}
+.ez.l span{transform:rotate(180deg);}
+.yl{position:absolute; top:0; bottom:0; width:1px; background:rgba(255,255,255,.34);}
+.yl.five{background:rgba(255,255,255,.17);}
+.ynum{
+  position:absolute; top:50%; transform:translate(-50%,-50%);
+  font-family:var(--board); font-size:15px; color:rgba(255,255,255,.55); letter-spacing:.5px;
+}
+#losLine{position:absolute; top:0; bottom:0; width:3px; background:var(--los); box-shadow:0 0 8px rgba(63,127,214,.8);}
+#togoLine{position:absolute; top:0; bottom:0; width:3px; background:var(--marker); box-shadow:0 0 8px rgba(242,197,61,.75);}
+#ballMark{
+  position:absolute; top:3px; transform:translateX(-50%);
+  width:0; height:0; border-left:7px solid transparent; border-right:7px solid transparent;
+  border-top:10px solid var(--ink); filter:drop-shadow(0 1px 2px rgba(0,0,0,.7));
+}
+#fieldFoot{
+  display:flex; align-items:baseline; gap:12px; padding:7px 2px 0; flex-wrap:wrap;
+}
+#ddBig{font-family:var(--board); font-size:25px; letter-spacing:.3px;}
+#spotBig{font-family:var(--board); font-size:25px; color:var(--amber);}
+#driveNow{font-size:12px; color:var(--dim); margin-left:auto; text-align:right;}
+
+/* ------------------------------- log --------------------------------- */
+#logHead{
+  display:flex; align-items:center; gap:8px; padding:6px 12px;
+  border-top:1px solid var(--line); border-bottom:1px solid var(--line); background:var(--panel);
+}
+#logHead .t{font-size:10px; letter-spacing:1.4px; color:var(--faint); text-transform:uppercase;}
+#log{flex:1 1 auto; overflow-y:auto; -webkit-overflow-scrolling:touch; padding:2px 0 14px;}
+.lrow{
+  display:flex; gap:9px; padding:6px 12px; border-bottom:1px solid #131a16; font-size:13.5px; align-items:baseline;
+}
+.lrow:active{background:var(--panel);}
+.lrow .sit{
+  flex:0 0 150px; line-height:1.4; font-family:var(--mono); font-size:10.5px; color:var(--faint);
+  font-variant-numeric:tabular-nums;
+}
+.lrow .txt{flex:1 1 auto; min-width:0;}
+.lrow .gn{font-family:var(--mono); font-size:11px; color:var(--dim); flex:0 0 auto;}
+.lrow.score{background:rgba(87,192,122,.07);}
+.lrow.score .txt{color:var(--green);}
+.lrow.turn{background:rgba(212,69,46,.07);}
+.lrow.turn .txt{color:var(--red);}
+.lrow.first .gn{color:var(--marker);}
+.lsep{
+  padding:5px 12px; background:var(--bg2); border-bottom:1px solid var(--line);
+  font-size:10px; letter-spacing:1.6px; text-transform:uppercase; color:var(--dim);
+  display:flex; justify-content:space-between; gap:8px;
+}
+.lsep .r{color:var(--faint); letter-spacing:.6px; text-transform:none;}
+#logEmpty{padding:26px 16px; color:var(--faint); font-size:13px; text-align:center; line-height:1.6;}
+
+/* ------------------------------- pad --------------------------------- */
+#padHead{
+  padding:7px 12px; border-bottom:1px solid var(--line); background:var(--panel);
+  display:flex; align-items:center; gap:8px;
+}
+#padWho{font-family:var(--board); font-size:18px; color:var(--tc,var(--ink));}
+#padHint{font-size:11px; color:var(--dim); margin-left:auto; text-align:right;}
+#pad{flex:1 1 auto; overflow-y:auto; -webkit-overflow-scrolling:touch; padding:10px 12px 8px;}
+.grp{margin-bottom:11px;}
+.glab{font-size:9.5px; letter-spacing:1.5px; text-transform:uppercase; color:var(--faint); margin-bottom:5px;}
+.row{display:flex; flex-wrap:wrap; gap:6px;}
+.btn{
+  background:var(--raised); border:1px solid var(--line2); border-radius:7px;
+  padding:10px 12px; font-size:13px; font-weight:600; letter-spacing:.3px; min-height:42px;
+  display:inline-flex; align-items:center; justify-content:center; gap:5px;
+}
+.btn:active{background:var(--raised2);}
+.btn.on{background:var(--amber); border-color:var(--amber); color:#1a1205;}
+.btn.wide{flex:1 1 0;}
+.btn.sm{padding:7px 9px; min-height:34px; font-size:12px; font-weight:500;}
+.btn.danger.on{background:var(--red); border-color:var(--red); color:#fff;}
+.btn.good.on{background:var(--green); border-color:var(--green); color:#07200f;}
+.chip{
+  background:var(--panel); border:1px solid var(--line2); border-radius:14px;
+  padding:6px 10px; font-size:12.5px; min-height:32px; display:inline-flex; align-items:center; gap:5px;
+}
+.chip .n{font-family:var(--mono); font-size:10.5px; color:var(--faint);}
+.chip.on{background:var(--ink); border-color:var(--ink); color:#0a0f0c;}
+.chip.on .n{color:#4a5850;}
+#yardBox{display:flex; align-items:stretch; gap:6px;}
+.yardVal{
+  flex:1 1 0; background:#05080a; border:1px solid var(--line2); border-radius:8px;
+  font-family:var(--board); font-size:40px; text-align:center; color:var(--ink);
+  font-variant-numeric:tabular-nums; padding:2px 4px; min-width:76px; width:100%;
+}
+.yardVal.neg{color:var(--red);}
+.step{
+  flex:0 0 46px; background:var(--raised); border:1px solid var(--line2); border-radius:8px;
+  font-size:17px; font-weight:700;
+}
+.step:active{background:var(--raised2);}
+#commit{
+  width:100%; border:none; border-radius:9px; padding:13px 12px; min-height:54px;
+  background:var(--amber); color:#1a1205; font-weight:700; font-size:15.5px; letter-spacing:.4px;
+  display:flex; align-items:center; justify-content:center; gap:9px;
+}
+#commit:active{filter:brightness(.9);}
+#commit .arrow{font-family:var(--mono); font-size:12px; opacity:.72; font-weight:600;}
+#commit[disabled]{background:var(--raised); color:var(--faint);}
+#padFoot{
+  flex:0 0 auto; padding:9px 12px calc(9px + var(--safe-b)); border-top:1px solid var(--line);
+  background:var(--panel); display:flex; flex-direction:column; gap:7px;
+}
+#padFootRow{display:flex; gap:6px;}
+.dice{
+  width:34px; height:34px; border-radius:6px; font-family:var(--board); font-size:19px;
+  display:inline-flex; align-items:center; justify-content:center; border:1px solid var(--line2);
+}
+.dice.w{background:#e8e6de; color:#15110a;}
+.dice.r{background:#8c2418; color:#f4e6e2;}
+.mini{
+  background:#05080a; border:1px solid var(--line2); border-radius:6px; color:var(--ink);
+  font-family:var(--mono); font-size:13px; padding:7px 8px; min-width:0; width:100%;
+}
+.inline{display:flex; align-items:center; gap:6px;}
+.inline .k{font-size:9.5px; letter-spacing:1.2px; color:var(--faint); text-transform:uppercase; flex:0 0 auto;}
+
+/* ----------------------------- overlays ------------------------------ */
+.ov[hidden]{display:none;}
+.ov{
+  position:fixed; inset:0; background:var(--bg); z-index:40; display:flex; flex-direction:column;
+  padding:var(--safe-t) var(--safe-r) var(--safe-b) var(--safe-l);
+}
+.ovHead{
+  flex:0 0 auto; display:flex; align-items:center; gap:10px; padding:10px 14px;
+  border-bottom:1px solid var(--line); background:var(--panel);
+}
+.ovHead h2{margin:0; font-family:var(--board); font-size:22px; letter-spacing:.5px; font-weight:400;}
+.ovHead .sp{margin-left:auto;}
+.ovBody{flex:1 1 auto; overflow-y:auto; -webkit-overflow-scrolling:touch; padding:14px; }
+.ovBody{max-width:1100px; width:100%; margin:0 auto;}
+h3.sec{
+  margin:20px 0 8px; font-size:10.5px; letter-spacing:1.8px; text-transform:uppercase;
+  color:var(--faint); font-weight:600; border-bottom:1px solid var(--line); padding-bottom:5px;
+}
+h3.sec:first-child{margin-top:0;}
+table{width:100%; border-collapse:collapse; font-size:13px;}
+.tw{overflow-x:auto; -webkit-overflow-scrolling:touch;}
+th{
+  text-align:right; font-size:9.5px; letter-spacing:1px; text-transform:uppercase; color:var(--faint);
+  padding:5px 7px; font-weight:600; border-bottom:1px solid var(--line); white-space:nowrap;
+}
+th:first-child,td:first-child{text-align:left;}
+td{padding:6px 7px; text-align:right; border-bottom:1px solid #141b17; font-variant-numeric:tabular-nums; white-space:nowrap;}
+tr.tot td{font-weight:700; color:var(--amber); border-bottom:1px solid var(--line);}
+.field{display:flex; flex-direction:column; gap:5px; margin-bottom:12px;}
+.field label{font-size:9.5px; letter-spacing:1.3px; text-transform:uppercase; color:var(--faint);}
+.field input,.field select,.field textarea{
+  background:#05080a; border:1px solid var(--line2); border-radius:7px; color:var(--ink);
+  padding:10px; font-size:15px; width:100%;
+}
+.field textarea{font-family:var(--mono); font-size:13px; line-height:1.55; min-height:170px; resize:vertical;}
+.cols{display:flex; gap:20px; flex-wrap:wrap;}
+.cols > *{flex:1 1 300px; min-width:0;}
+.note{font-size:12.5px; color:var(--dim); line-height:1.6;}
+.note code{font-family:var(--mono); font-size:11.5px; background:var(--panel); padding:1px 4px; border-radius:3px;}
+.linescore td,.linescore th{text-align:center;}
+.linescore td:first-child,.linescore th:first-child{text-align:left; font-family:var(--board); font-size:17px;}
+.linescore td:last-child{font-weight:700; font-size:16px; color:var(--amber);}
+.rrow{display:flex; gap:6px; align-items:center; margin-bottom:5px;}
+.rrow input{
+  background:#05080a; border:1px solid var(--line2); border-radius:6px; color:var(--ink);
+  padding:8px; font-size:14px; min-width:0;
+}
+.rrow .rn{flex:0 0 58px; text-align:center; font-family:var(--mono);}
+.rrow .rp{flex:0 0 66px; text-align:center; text-transform:uppercase;}
+.rrow .rnm{flex:1 1 auto;}
+.rrow .rx{flex:0 0 34px; background:var(--raised); border:1px solid var(--line2); border-radius:6px; min-height:34px;}
+#toast{
+  position:fixed; left:50%; bottom:calc(22px + var(--safe-b)); transform:translateX(-50%) translateY(14px);
+  background:var(--raised2); border:1px solid var(--line2); color:var(--ink);
+  padding:11px 17px; border-radius:9px; font-size:14px; z-index:90; pointer-events:none;
+  opacity:0; transition:opacity .18s, transform .18s; max-width:88vw; text-align:center;
+}
+#toast.show{opacity:1; transform:translateX(-50%) translateY(0);}
+#toast.good{border-color:var(--green); color:var(--green);}
+#toast.bad{border-color:var(--red); color:var(--red);}
+.drv{border-left:3px solid var(--line2); padding:7px 0 7px 11px; margin-bottom:9px;}
+.drv .h{display:flex; gap:9px; align-items:baseline; flex-wrap:wrap;}
+.drv .tm{font-family:var(--board); font-size:17px;}
+.drv .rs{font-size:11px; letter-spacing:1.1px; text-transform:uppercase;}
+.drv .dt{font-size:12px; color:var(--dim); margin-top:2px;}
+.drv.sc{border-left-color:var(--green);}
+.drv.sc .rs{color:var(--green);}
+.drv.tv{border-left-color:var(--red);}
+.drv.tv .rs{color:var(--red);}
+.gcard{
+  display:flex; gap:11px; align-items:center; padding:11px; background:var(--panel);
+  border:1px solid var(--line); border-radius:9px; margin-bottom:7px;
+}
+.gcard .gs{font-family:var(--board); font-size:19px; flex:0 0 auto; font-variant-numeric:tabular-nums;}
+.gcard .gm{flex:1 1 auto; min-width:0;}
+.gcard .gm b{display:block; font-size:14px; font-weight:600; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;}
+.gcard .gm span{font-size:11.5px; color:var(--faint);}
+@media (max-width:820px){
+  #body{flex-direction:column; overflow-y:auto;}
+  #right{flex:0 0 auto; border-left:none; border-top:1px solid var(--line);}
+  #left{flex:0 0 auto;}
+  #log{max-height:38vh;}
+  #pad{overflow:visible;}
+  .cell{min-width:74px; padding:6px 9px;}
+  .cell .v{font-size:24px;}
+  .side .pts{font-size:42px;}
+  .lrow .sit{flex:0 0 108px;}
+}
+@media (max-width:600px){
+  #board{flex-wrap:wrap;}
+  #centre{order:3; flex:1 1 100%; justify-content:space-between;}
+  #menu{flex-direction:row; order:2;}
+  .side{flex:1 1 40%;}
+}
+@media (prefers-reduced-motion:reduce){ *{transition:none !important; animation:none !important;} }
+</style>
+</head>
+<body>
+
+<div id="app">
+
+  <!-- ============================ scoreboard ============================ -->
+  <div id="board">
+    <div class="side away" id="sideAway">
+      <div class="ball"></div>
+      <div class="meta">
+        <div class="abbr" id="abbrAway">VIS</div>
+        <div class="tos" id="tosAway"></div>
+      </div>
+      <div class="pts num" id="ptsAway">0</div>
+    </div>
+
+    <div id="centre">
+      <div class="cell" id="cellQtr"><div class="k">Qtr</div><div class="v num" id="vQtr">1</div></div>
+      <div class="cell" id="cellClock"><div class="k" id="kClock">Clock</div><div class="v num" id="vClock">15:00</div></div>
+      <div class="cell" id="cellDD"><div class="k">Down</div><div class="v sm" id="vDD">—</div></div>
+      <div class="cell" id="cellSpot"><div class="k">Ball on</div><div class="v sm num" id="vSpot">—</div></div>
+    </div>
+
+    <div id="menu">
+      <button class="mbtn" id="btnUndo">↶ Undo</button>
+      <button class="mbtn" id="btnBox">Box score</button>
+      <button class="mbtn" id="btnMore">Menu</button>
+    </div>
+
+    <div class="side home" id="sideHome">
+      <div class="ball"></div>
+      <div class="meta">
+        <div class="abbr" id="abbrHome">HOME</div>
+        <div class="tos" id="tosHome"></div>
+      </div>
+      <div class="pts num" id="ptsHome">0</div>
+    </div>
+  </div>
+
+  <!-- ============================== body =============================== -->
+  <div id="body">
+
+    <div id="left">
+      <div id="fieldWrap">
+        <div id="field">
+          <div class="ez l"><span id="ezL">VIS</span></div>
+          <div class="ez r"><span id="ezR">HOME</span></div>
+          <div id="marks"></div>
+          <div id="togoLine" hidden></div>
+          <div id="losLine" hidden></div>
+          <div id="ballMark" hidden></div>
+        </div>
+        <div id="fieldFoot">
+          <div id="ddBig">Pre-game</div>
+          <div id="spotBig"></div>
+          <div id="driveNow"></div>
+        </div>
+      </div>
+
+      <div id="logHead">
+        <div class="t">Play by play</div>
+        <button class="mbtn" id="btnDrives" style="margin-left:auto">Drives</button>
+        <button class="mbtn" id="btnJumpEnd">Latest</button>
+      </div>
+      <div id="log"><div id="logEmpty"></div></div>
+    </div>
+
+    <div id="right">
+      <div id="padHead">
+        <div id="padWho">—</div>
+        <div id="padHint"></div>
+      </div>
+      <div id="pad">
+        <div class="grp" id="grpType">
+          <div class="glab">Play</div>
+          <div class="row" id="rowType"></div>
+        </div>
+        <div id="grpCtx"></div>
+      </div>
+      <div id="padFoot">
+        <div id="padFootRow">
+          <button class="dice w" id="dieW">—</button>
+          <button class="dice r" id="dieR">—</button>
+          <button class="btn sm" id="btnRoll">Roll</button>
+          <div class="inline" style="flex:1 1 0"><span class="k">PRN</span><input class="mini" id="inPRN" inputmode="numeric" placeholder="—"></div>
+          <div class="inline" style="flex:1 1 0"><span class="k">Def</span><input class="mini" id="inDef" placeholder="—"></div>
+        </div>
+        <button id="commit"><span id="commitLab">Record play</span><span class="arrow" id="commitNext"></span></button>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<!-- ============================== overlays ============================== -->
+<div class="ov" id="ovBox" hidden>
+  <div class="ovHead">
+    <h2>Box score</h2>
+    <button class="mbtn sp" id="boxText">Copy as text</button>
+    <button class="mbtn" id="boxJSON">Export game</button>
+    <button class="mbtn" id="boxClose">Close</button>
+  </div>
+  <div class="ovBody" id="boxBody"></div>
+</div>
+
+<div class="ov" id="ovDrives" hidden>
+  <div class="ovHead"><h2>Drive chart</h2><button class="mbtn sp" id="drivesClose">Close</button></div>
+  <div class="ovBody" id="drivesBody"></div>
+</div>
+
+<div class="ov" id="ovMenu" hidden>
+  <div class="ovHead"><h2>Menu</h2><button class="mbtn sp" id="menuClose">Close</button></div>
+  <div class="ovBody" id="menuBody"></div>
+</div>
+
+<div class="ov" id="ovRoster" hidden>
+  <div class="ovHead">
+    <h2 id="rosterTitle">Roster</h2>
+    <button class="mbtn sp" id="rosterPaste">Paste a list</button>
+    <button class="mbtn" id="rosterAdd">+ Player</button>
+    <button class="mbtn" id="rosterClose">Done</button>
+  </div>
+  <div class="ovBody" id="rosterBody"></div>
+</div>
+
+<div class="ov" id="ovSetup" hidden>
+  <div class="ovHead"><h2>Game setup</h2><button class="mbtn sp" id="setupClose">Done</button></div>
+  <div class="ovBody" id="setupBody"></div>
+</div>
+
+<div class="ov" id="ovGames" hidden>
+  <div class="ovHead">
+    <h2>Games</h2>
+    <button class="mbtn sp" id="gamesNew">New game</button>
+    <button class="mbtn" id="gamesImport">Import</button>
+    <button class="mbtn" id="gamesClose">Close</button>
+  </div>
+  <div class="ovBody" id="gamesBody"></div>
+</div>
+
+<div class="ov" id="ovSeason" hidden>
+  <div class="ovHead">
+    <h2>Season totals</h2>
+    <button class="mbtn sp" id="seasonText">Copy as text</button>
+    <button class="mbtn" id="seasonClose">Close</button>
+  </div>
+  <div class="ovBody" id="seasonBody"></div>
+</div>
+
+<div class="ov" id="ovEdit" hidden>
+  <div class="ovHead">
+    <h2>Edit play</h2>
+    <button class="mbtn sp" id="editDelete">Delete play</button>
+    <button class="mbtn" id="editClose">Close</button>
+  </div>
+  <div class="ovBody" id="editBody"></div>
+</div>
+
+<input type="file" id="fileIn" accept="application/json,.json" hidden>
+<div id="toast"></div>
+
+<script>
+'use strict';
+
+/* =====================================================================
+   APBA Football — Scorekeeper
+   Score, chains and a full box score for the APBA Pro Football board
+   game. One file, no network, no dependencies, no build step.
+
+   The play list is the only truth. Every score, down, drive and stat is
+   re-derived from it on each render, so undo, edit and delete can never
+   leave the board disagreeing with the sheet.
+   ===================================================================== */
+
+var VERSION = '1.0';
+var STORE_KEY = 'apba.football.v1';
+
+/* ------------------------------ helpers ------------------------------ */
+function $(id){ return document.getElementById(id); }
+function el(tag, cls, txt){
+  var n = document.createElement(tag);
+  if(cls) n.className = cls;
+  if(txt != null) n.textContent = txt;
+  return n;
+}
+function clamp(v, lo, hi){ return v < lo ? lo : (v > hi ? hi : v); }
+function uid(p){ return (p || 'x') + Math.random().toString(36).slice(2, 9); }
+function other(t){ return t === 'away' ? 'home' : 'away'; }
+function clone(o){ return JSON.parse(JSON.stringify(o)); }
+function num(v, d){ var n = parseInt(v, 10); return isNaN(n) ? (d || 0) : n; }
+function pad2(n){ return String(n).padStart(2, '0'); }
+function ord(n){
+  return n + (n === 1 ? 'st' : n === 2 ? 'nd' : n === 3 ? 'rd' : 'th');
+}
+/* 615 -> "10:15" */
+function mmss(s){
+  s = Math.max(0, Math.round(s));
+  return Math.floor(s / 60) + ':' + pad2(s % 60);
+}
+function plus(n){ return (n > 0 ? '+' : '') + n; }
+
+var toastTimer = null;
+function toast(msg, kind){
+  var t = $('toast');
+  t.textContent = msg;
+  t.className = 'show' + (kind ? ' ' + kind : '');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(function(){ t.className = ''; }, 2400);
+}
+
+/* --------------------------- the game model --------------------------- */
+var DEFAULT_ROSTER = [
+  [12,'QB'],[7,'QB'],[22,'RB'],[32,'RB'],[44,'FB'],[80,'WR'],[88,'WR'],[85,'WR'],
+  [87,'TE'],[84,'TE'],[3,'K'],[5,'P'],
+  [75,'DE'],[70,'DT'],[55,'LB'],[58,'LB'],[52,'LB'],
+  [21,'CB'],[24,'CB'],[42,'S'],[47,'S']
+];
+
+function makeRoster(){
+  return DEFAULT_ROSTER.map(function(r){
+    return { id: uid('p'), num: r[0], pos: r[1], name: '' };
+  });
+}
+function makeTeam(name, abbr, color){
+  return { name: name, abbr: abbr, color: color, roster: makeRoster() };
+}
+function defaultRules(){
+  return {
+    clockMode: 'time',        /* 'time' or 'plays' — editions differ */
+    qtrMinutes: 15,
+    otMinutes: 10,
+    playsPerQtr: 30,
+    timeouts: 3,
+    koFrom: 35,               /* kickoff is taken from the kicking team's own 35 */
+    tbKick: 25,               /* touchback on a kickoff */
+    tbPunt: 20,               /* touchback on a punt */
+    fgMissSpot: 'kick',       /* 'kick' (modern), 'twenty', or 'los' (pre-1974) */
+    twoPoint: true,
+    firstKick: 'home',        /* who kicks off to open the game */
+    secs: { run:35, passC:35, passI:6, sack:35, punt:14, fg:6, ko:8, pen:12,
+            kneel:40, spike:3, pat:0, oob:5 }
+  };
+}
+function newGame(prev){
+  var g = {
+    id: uid('g'), v: 1, app: VERSION,
+    created: Date.now(),
+    date: new Date().toISOString().slice(0, 10),
+    label: '', venue: '', notes: '',
+    teams: {
+      away: makeTeam('Visitors', 'VIS', '#4f8fd0'),
+      home: makeTeam('Home', 'HOME', '#d9a441')
+    },
+    rules: defaultRules(),
+    plays: []
+  };
+  if(prev){ /* keep the two clubs and the house rules when starting the next game */
+    g.teams.away = clone(prev.teams.away);
+    g.teams.home = clone(prev.teams.home);
+    g.rules = clone(prev.rules);
+    g.venue = prev.venue;
+  }
+  return g;
+}
+
+/* ------------------------------ storage ------------------------------ */
+var DB = { games: {}, order: [], current: null };
+
+function loadDB(){
+  try{
+    var raw = localStorage.getItem(STORE_KEY);
+    if(raw){
+      var d = JSON.parse(raw);
+      if(d && d.games){ DB = d; DB.order = DB.order || Object.keys(d.games); }
+    }
+  }catch(e){ /* private window, or storage refused — run from memory */ }
+  if(!DB.order.length || !DB.games[DB.current]){
+    var g = newGame(null);
+    DB.games[g.id] = g; DB.order.unshift(g.id); DB.current = g.id;
+  }
+}
+function saveDB(){
+  try{ localStorage.setItem(STORE_KEY, JSON.stringify(DB)); }
+  catch(e){ toast('The browser would not save — the game is still on screen.', 'bad'); }
+}
+function G(){ return DB.games[DB.current]; }
+
+/* ---------------------------- player lookup --------------------------- */
+function roster(team){ return G().teams[team].roster; }
+function player(team, pid){
+  var r = roster(team);
+  for(var i = 0; i < r.length; i++) if(r[i].id === pid) return r[i];
+  return null;
+}
+function pLabel(team, pid, withNum){
+  var p = player(team, pid);
+  if(!p) return '';
+  var nm = p.name || (p.pos + ' #' + p.num);
+  return withNum === false ? nm : (p.name ? p.name : nm);
+}
+function pShort(team, pid){
+  var p = player(team, pid);
+  if(!p) return '—';
+  if(!p.name) return '#' + p.num + ' ' + p.pos;
+  var parts = p.name.trim().split(/\s+/);
+  return parts.length > 1 ? (parts[0][0] + '. ' + parts.slice(1).join(' ')) : p.name;
+}
+function firstAt(team, positions){
+  var r = roster(team);
+  for(var i = 0; i < positions.length; i++)
+    for(var j = 0; j < r.length; j++)
+      if(r[j].pos.toUpperCase() === positions[i]) return r[j].id;
+  return r.length ? r[0].id : null;
+}
+
+/* ============================ the reducer ============================= */
+/* Field position is held as `yard`: 0 is the possessing team's own goal
+   line, 100 the one they are attacking. Everything else falls out of it. */
+
+function fmtSpot(yard, off){
+  if(yard == null) return '—';
+  var g = G();
+  if(yard === 50) return '50';
+  if(yard < 50) return g.teams[off].abbr + ' ' + Math.round(yard);
+  return g.teams[other(off)].abbr + ' ' + Math.round(100 - yard);
+}
+function fmtDD(st){
+  if(st.phase === 'kickoff') return st.freeKick ? 'Free kick' : 'Kickoff';
+  if(st.phase === 'pat') return 'Try';
+  if(st.phase === 'final') return 'Final';
+  if(st.poss == null) return '—';
+  var toGoal = 100 - st.yard;
+  var goal = st.yard + st.toGo >= 100;
+  return ord(st.down) + ' & ' + (goal ? 'Goal' : st.toGo) + (goal && toGoal !== st.toGo ? '' : '');
+}
+
+function newTeamStats(){
+  return {
+    fd:{ r:0, p:0, n:0 }, d3:{ a:0, c:0 }, d4:{ a:0, c:0 },
+    ra:0, ry:0, rtd:0, pa:0, pc:0, py:0, ptd:0, pint:0, sk:0, sky:0,
+    plays:0, pen:{ n:0, y:0 }, fum:{ n:0, l:0 },
+    punt:{ n:0, y:0, long:0, in20:0, blk:0 },
+    fg:{ a:0, m:0 }, xp:{ a:0, m:0 }, two:{ a:0, m:0 },
+    kr:{ n:0, y:0 }, pr:{ n:0, y:0 }, ir:{ n:0, y:0 },
+    pos:0, big:0, rz:{ t:0, td:0, fg:0 }
+  };
+}
+function newPlayerStat(){
+  return {
+    pa:0, pc:0, py:0, ptd:0, pint:0, sk:0, sky:0, plong:0,
+    ra:0, ry:0, rtd:0, rlong:0,
+    tgt:0, rec:0, recy:0, rectd:0, reclong:0,
+    fga:0, fgm:0, fglong:0, xpa:0, xpm:0,
+    pn:0, pny:0, pnlong:0, in20:0,
+    kr:0, kry:0, krtd:0, pr:0, pry:0, prtd:0,
+    dint:0, dinty:0, dinttd:0, dsack:0, dsacky:0, dfr:0, dff:0, dtd:0
+  };
+}
+
+function initState(g){
+  var q = g.rules.clockMode === 'time' ? g.rules.qtrMinutes * 60 : 0;
+  return {
+    qtr: 1, clock: q, playsLeft: g.rules.playsPerQtr,
+    poss: null, down: 1, toGo: 10, yard: null,
+    score: { away:0, home:0 },
+    line: { away:[0,0,0,0], home:[0,0,0,0] },
+    to: { away: g.rules.timeouts, home: g.rules.timeouts },
+    phase: 'kickoff', kickTeam: g.rules.firstKick, freeKick: false,
+    expired: false, over: false, half: 1
+  };
+}
+
+function secsFor(p, g){
+  if(p.secs != null && p.secs !== '') return num(p.secs, 0);
+  var s = g.rules.secs;
+  switch(p.t){
+    case 'run':   return p.oob ? s.oob : s.run;
+    case 'pass':  return p.result === 'int' ? s.passC : (p.complete ? (p.oob ? s.oob : s.passC) : s.passI);
+    case 'sack':  return s.sack;
+    case 'punt':  return s.punt;
+    case 'fg':    return s.fg;
+    case 'ko':    return s.ko;
+    case 'pen':   return s.pen;
+    case 'kneel': return s.kneel;
+    case 'spike': return s.spike;
+    case 'xp': case 'two': return s.pat;
+    default: return 0;
+  }
+}
+
+function addScore(st, team, pts){
+  st.score[team] += pts;
+  var i = st.qtr - 1;
+  while(st.line[team].length <= i){ st.line.away.push(0); st.line.home.push(0); }
+  st.line[team][i] += pts;
+}
+function setFirstAndTen(st){
+  st.down = 1;
+  st.toGo = Math.min(10, 100 - st.yard);
+}
+/* hand the ball to `team`, who will be standing on their own `yard` line */
+function giveBall(st, team, yard){
+  st.poss = team;
+  st.yard = clamp(Math.round(yard), 1, 99);
+  setFirstAndTen(st);
+  st.phase = 'scrimmage';
+  st.freeKick = false;
+}
+function scored(st, team, kind){
+  /* a touchdown leaves the try to come; everything else goes straight to the kick */
+  if(kind === 'td'){
+    addScore(st, team, 6);
+    st.phase = 'pat'; st.patTeam = team; st.poss = team; st.yard = null;
+  }
+}
+function toKickoff(st, kicking, free){
+  st.phase = 'kickoff'; st.kickTeam = kicking; st.freeKick = !!free;
+  st.poss = null; st.yard = null; st.down = 1; st.toGo = 10;
+}
+
+function PS(S, team, pid){
+  if(!pid) return null;
+  var k = team + ':' + pid;
+  if(!S.p[k]) S.p[k] = newPlayerStat();
+  return S.p[k];
+}
+function longer(o, key, v){ if(v > o[key]) o[key] = v; }
+
+/* Apply one play. Mutates `st` and the stat bag `S`; returns an event
+   record the log and the drive chart read. */
+function applyPlay(st, p, g, S){
+  var ev = { cls:'', score:null, turnover:false, first:false, end:null, gain:null };
+  var off = st.poss, def = off ? other(off) : null;
+  var T = function(t){ return S.t[t]; };
+  var pre = { yard: st.yard, down: st.down, toGo: st.toGo, poss: st.poss };
+  var line = st.yard != null ? st.yard + st.toGo : null;
+
+  /* A play can be left stranded by deleting or correcting an earlier one —
+     a run recorded while the board says kickoff, a try with no touchdown
+     behind it. Skip it and say so in the log rather than taking the whole
+     sheet down. */
+  var needsBall = ['run','pass','sack','kneel','spike','punt','fg','pen'];
+  if((needsBall.indexOf(p.t) >= 0 && (off == null || st.phase !== 'scrimmage')) ||
+     ((p.t === 'xp' || p.t === 'two') && st.phase !== 'pat') ||
+     (p.t === 'ko' && st.phase !== 'kickoff')){
+    ev.end = 'skipped';
+    ev.pre = pre;
+    return ev;
+  }
+
+  function endOfPlay(newYard, countDown){
+    /* shared tail for every play run from scrimmage */
+    if(newYard >= 100){
+      scored(st, off, 'td'); ev.score = { team: off, kind: 'TD', pts: 6 }; ev.end = 'td';
+      return;
+    }
+    if(newYard <= 0){
+      addScore(st, def, 2);
+      ev.score = { team: def, kind: 'Safety', pts: 2 }; ev.end = 'safety';
+      toKickoff(st, off, true);
+      return;
+    }
+    st.yard = newYard;
+    if(newYard >= line){
+      ev.first = true;
+      if(st.down === 3) T(off).d3.c++;
+      if(st.down === 4) T(off).d4.c++;
+      setFirstAndTen(st);
+      ev.end = 'first';
+    }else if(countDown === false){
+      st.toGo = line - newYard;
+    }else if(st.down >= 4){
+      ev.turnover = true; ev.end = 'downs';
+      giveBall(st, def, 100 - newYard);
+    }else{
+      st.down++;
+      st.toGo = line - newYard;
+    }
+  }
+  function turnoverAt(defOwnYard, tdKey, whoTD){
+    if(defOwnYard >= 100){
+      addScore(st, def, 6);
+      ev.score = { team: def, kind: tdKey, pts: 6 };
+      st.phase = 'pat'; st.patTeam = def; st.poss = def; st.yard = null;
+      if(whoTD) whoTD();
+    }else{
+      giveBall(st, def, Math.max(1, defOwnYard));
+    }
+    ev.turnover = true;
+  }
+  function countDownAttempt(){
+    if(st.down === 3) T(off).d3.a++;
+    if(st.down === 4) T(off).d4.a++;
+  }
+
+  switch(p.t){
+
+  /* ------------------------------ kickoff ----------------------------- */
+  case 'ko': {
+    var kick = st.kickTeam, recv = other(kick);
+    var ks = PS(S, kick, p.kicker);
+    if(p.onside){
+      var rec = p.onsideRec === 'k' ? kick : recv;
+      giveBall(st, rec, num(p.spot, rec === kick ? 48 : 45));
+      ev.end = 'onside';
+      if(rec === kick) ev.cls = 'turn';
+    }else if(p.touchback){
+      giveBall(st, recv, g.rules.tbKick);
+      ev.end = 'touchback';
+    }else{
+      var caught = num(p.catchAt, 5);
+      var to = num(p.toYard, caught);
+      var ret = to - caught;
+      var rs = PS(S, recv, p.returner);
+      if(rs){ rs.kr++; rs.kry += ret; }
+      T(recv).kr.n++; T(recv).kr.y += ret;
+      if(p.result === 'td'){
+        if(rs){ rs.krtd++; rs.kry += (100 - caught) - ret; }
+        addScore(st, recv, 6);
+        ev.score = { team: recv, kind: 'KR TD', pts: 6 };
+        st.phase = 'pat'; st.patTeam = recv; st.poss = recv; st.yard = null;
+      }else if(p.result === 'fumlost'){
+        T(recv).fum.n++; T(recv).fum.l++;
+        giveBall(st, kick, 100 - to);
+        ev.turnover = true; ev.end = 'fumble';
+      }else{
+        giveBall(st, recv, to);
+      }
+    }
+    break;
+  }
+
+  /* -------------------------------- punt ------------------------------ */
+  case 'punt': {
+    countDownAttempt();
+    T(off).plays++;
+    var ps = PS(S, off, p.punter);
+    if(p.blocked){
+      T(off).punt.blk++;
+      if(p.blockRec === 'd'){
+        ev.end = 'blocked';
+        turnoverAt(100 - num(p.spot, st.yard));
+      }else{
+        endOfPlay(clamp(num(p.spot, st.yard), 0, 99), true);
+        ev.end = ev.end || 'blocked';
+      }
+      break;
+    }
+    var gross = num(p.gross, 42);
+    var land = st.yard + gross;
+    var tb = p.touchback || land >= 100;
+    if(tb) gross = 100 - st.yard;
+    T(off).punt.n++; T(off).punt.y += gross;
+    longer(T(off).punt, 'long', gross);
+    if(ps){ ps.pn++; ps.pny += gross; longer(ps, 'pnlong', gross); }
+    if(!tb && land >= 80){ T(off).punt.in20++; if(ps) ps.in20++; }
+    if(tb){
+      giveBall(st, def, g.rules.tbPunt);
+      ev.end = 'touchback';
+    }else{
+      var ownSpot = 100 - land;
+      var pret = num(p.retYards, 0);
+      var prs = PS(S, def, p.returner);
+      if(!p.fairCatch && !p.downed){
+        if(prs){ prs.pr++; prs.pry += pret; }
+        T(def).pr.n++; T(def).pr.y += pret;
+      }
+      if(p.result === 'td'){
+        if(prs) prs.prtd++;
+        addScore(st, def, 6);
+        ev.score = { team: def, kind: 'PR TD', pts: 6 };
+        st.phase = 'pat'; st.patTeam = def; st.poss = def; st.yard = null;
+      }else if(p.result === 'fumlost'){
+        T(def).fum.n++; T(def).fum.l++;
+        giveBall(st, off, 100 - (ownSpot + pret));
+        ev.end = 'fumble';
+      }else{
+        giveBall(st, def, ownSpot + pret);
+        ev.end = 'punt';
+      }
+    }
+    ev.turnover = false;
+    break;
+  }
+
+  /* ----------------------------- field goal --------------------------- */
+  case 'fg': {
+    countDownAttempt();
+    T(off).plays++;
+    var dist = num(p.dist, (100 - st.yard) + 17);
+    var fs = PS(S, off, p.kicker);
+    T(off).fg.a++; if(fs) fs.fga++;
+    if(p.good){
+      T(off).fg.m++;
+      if(fs){ fs.fgm++; longer(fs, 'fglong', dist); }
+      addScore(st, off, 3);
+      ev.score = { team: off, kind: 'FG', pts: 3 };
+      ev.end = 'fg';
+      toKickoff(st, off, false);
+    }else{
+      ev.end = p.blocked ? 'fgblock' : 'fgmiss';
+      var spot;
+      if(g.rules.fgMissSpot === 'twenty') spot = g.rules.tbPunt;
+      else if(g.rules.fgMissSpot === 'los') spot = 100 - st.yard;
+      else spot = Math.max(g.rules.tbPunt, 100 - Math.max(1, st.yard - 7));
+      giveBall(st, def, spot);
+      ev.turnover = true;
+    }
+    break;
+  }
+
+  /* -------------------------------- try ------------------------------- */
+  case 'xp': {
+    var team = st.patTeam;
+    var xs = PS(S, team, p.kicker);
+    S.t[team].xp.a++; if(xs) xs.xpa++;
+    if(p.good){
+      S.t[team].xp.m++; if(xs) xs.xpm++;
+      addScore(st, team, 1);
+      ev.score = { team: team, kind: 'XP', pts: 1 };
+    }else ev.end = 'xpmiss';
+    toKickoff(st, team, false);
+    break;
+  }
+  case 'two': {
+    var t2 = st.patTeam;
+    S.t[t2].two.a++;
+    if(p.good){
+      S.t[t2].two.m++;
+      addScore(st, t2, 2);
+      ev.score = { team: t2, kind: '2-pt', pts: 2 };
+    }else ev.end = 'twofail';
+    toKickoff(st, t2, false);
+    break;
+  }
+
+  /* ------------------------- plays from scrimmage --------------------- */
+  case 'run': case 'kneel': {
+    countDownAttempt();
+    var gain = p.t === 'kneel' ? num(p.yards, -1) : num(p.yards, 0);
+    var rsh = PS(S, off, p.rusher);
+    T(off).plays++; T(off).ra++; T(off).ry += gain;
+    if(rsh){ rsh.ra++; rsh.ry += gain; longer(rsh, 'rlong', gain); }
+    longer(T(off), 'big', gain);
+    if(p.fumble){ T(off).fum.n++; }
+    if(p.result === 'fumlost'){
+      T(off).fum.n += p.fumble ? 0 : 1; T(off).fum.l++;
+      var fspot = clamp(st.yard + gain, 0, 100);
+      var fr = PS(S, def, p.defender); if(fr) fr.dfr++;
+      turnoverAt(100 - fspot + num(p.retYards, 0), 'FR TD', function(){ if(fr) fr.dtd++; });
+      ev.end = 'fumble'; ev.gain = gain;
+      break;
+    }
+    ev.gain = gain;
+    endOfPlay(st.yard + gain, true);
+    if(ev.end === 'td' && rsh) rsh.rtd++;
+    if(ev.end === 'td') T(off).rtd++;
+    if(ev.first) T(off).fd.r++;
+    break;
+  }
+
+  case 'spike': {
+    countDownAttempt();
+    T(off).plays++; T(off).pa++;
+    var sp = PS(S, off, p.passer); if(sp){ sp.pa++; }
+    endOfPlay(st.yard, true);
+    break;
+  }
+
+  case 'pass': {
+    countDownAttempt();
+    T(off).plays++; T(off).pa++;
+    var qb = PS(S, off, p.passer);
+    var wr = PS(S, off, p.receiver);
+    if(qb) qb.pa++;
+    if(wr) wr.tgt++;
+    var y = num(p.yards, 0);
+
+    if(p.result === 'int'){
+      T(off).pint++; if(qb) qb.pint++;
+      var db = PS(S, def, p.defender);
+      var iy = num(p.retYards, 0);
+      if(db){ db.dint++; db.dinty += iy; }
+      T(def).ir.n++; T(def).ir.y += iy;
+      var at = clamp(st.yard + y, 0, 100);
+      ev.end = 'int';
+      turnoverAt(100 - at + iy, 'INT TD', function(){ if(db){ db.dinttd++; db.dtd++; } });
+      break;
+    }
+    if(!p.complete){
+      ev.end = 'incomplete';
+      endOfPlay(st.yard, true);
+      break;
+    }
+    T(off).pc++; T(off).py += y;
+    if(qb){ qb.pc++; qb.py += y; longer(qb, 'plong', y); }
+    if(wr){ wr.rec++; wr.recy += y; longer(wr, 'reclong', y); }
+    longer(T(off), 'big', y);
+    if(p.result === 'fumlost'){
+      T(off).fum.n++; T(off).fum.l++;
+      var pfs = clamp(st.yard + y, 0, 100);
+      var pfr = PS(S, def, p.defender); if(pfr) pfr.dfr++;
+      turnoverAt(100 - pfs + num(p.retYards, 0), 'FR TD', function(){ if(pfr) pfr.dtd++; });
+      ev.end = 'fumble'; ev.gain = y;
+      break;
+    }
+    ev.gain = y;
+    endOfPlay(st.yard + y, true);
+    if(ev.end === 'td'){ T(off).ptd++; if(qb) qb.ptd++; if(wr) wr.rectd++; }
+    if(ev.first) T(off).fd.p++;
+    break;
+  }
+
+  case 'sack': {
+    countDownAttempt();
+    var loss = Math.abs(num(p.yards, 0));
+    T(off).plays++; T(off).sk++; T(off).sky += loss;
+    var sqb = PS(S, off, p.passer); if(sqb){ sqb.sk++; sqb.sky += loss; }
+    var sd = PS(S, def, p.defender); if(sd){ sd.dsack++; sd.dsacky += loss; }
+    if(p.result === 'fumlost'){
+      T(off).fum.n++; T(off).fum.l++;
+      var sfs = clamp(st.yard - loss, 0, 100);
+      var sfr = PS(S, def, p.defender2 || p.defender); if(sfr) sfr.dfr++;
+      if(sfs <= 0){
+        addScore(st, def, 2);
+        ev.score = { team: def, kind:'Safety', pts:2 }; ev.end = 'safety';
+        toKickoff(st, off, true);
+      }else{
+        turnoverAt(100 - sfs + num(p.retYards, 0), 'FR TD', function(){ if(sfr) sfr.dtd++; });
+        ev.end = 'fumble';
+      }
+      break;
+    }
+    ev.gain = -loss;
+    endOfPlay(st.yard - loss, true);
+    break;
+  }
+
+  /* ------------------------------ penalty ----------------------------- */
+  case 'pen': {
+    var pyd = num(p.yards, 5);
+    var onOff = p.on === 'o';
+    var team = onOff ? off : def;
+    T(team).pen.n++;
+    var pen = PS(S, team, p.player);
+    var applied, ny;
+    if(onOff){
+      applied = Math.min(pyd, Math.floor(st.yard / 2));
+      ny = st.yard - applied;
+      T(team).pen.y += applied;
+      if(p.lossDown){
+        if(st.down >= 4){
+          st.yard = ny; ev.turnover = true; ev.end = 'downs';
+          giveBall(st, def, 100 - ny);
+          break;
+        }
+        st.down++;
+      }
+      st.yard = ny;
+      st.toGo = Math.max(1, line - ny);
+    }else{
+      applied = Math.min(pyd, Math.max(0, Math.floor((100 - st.yard) / 2)));
+      ny = st.yard + applied;
+      T(team).pen.y += applied;
+      st.yard = ny;
+      if(p.auto1st || ny >= line){
+        ev.first = true; T(off).fd.n++;
+        setFirstAndTen(st);
+      }else{
+        st.toGo = Math.max(1, line - ny);
+      }
+    }
+    if(pen) { /* individual penalty counts live on the team line only */ }
+    ev.end = 'penalty';
+    break;
+  }
+
+  /* ---------------------------- bookkeeping --------------------------- */
+  case 'to': {
+    if(p.team && st.to[p.team] > 0) st.to[p.team]--;
+    ev.end = 'timeout';
+    break;
+  }
+  case 'clock': {
+    st.clock = Math.max(0, st.clock + num(p.delta, 0));
+    st.expired = st.clock <= 0 && g.rules.clockMode === 'time';
+    ev.end = 'clock';
+    return ev;
+  }
+  case 'endq': {
+    var q = st.qtr + 1;
+    st.qtr = q;
+    st.expired = false;
+    st.clock = g.rules.clockMode === 'time'
+      ? (q >= 5 ? g.rules.otMinutes * 60 : g.rules.qtrMinutes * 60) : 0;
+    st.playsLeft = g.rules.playsPerQtr;
+    while(st.line.away.length < q){ st.line.away.push(0); st.line.home.push(0); }
+    if(q === 3){
+      /* second half: whoever received to open the game now kicks */
+      st.half = 2;
+      st.to.away = g.rules.timeouts; st.to.home = g.rules.timeouts;
+      toKickoff(st, other(g.rules.firstKick), false);
+    }else if(q >= 5){
+      st.to.away = 2; st.to.home = 2;
+      toKickoff(st, p.koTeam || g.rules.firstKick, false);
+    }
+    ev.end = 'endq';
+    return ev;
+  }
+  case 'final': {
+    st.over = true; st.phase = 'final';
+    ev.end = 'final';
+    return ev;
+  }
+  case 'note': ev.end = 'note'; return ev;
+  }
+
+  /* clock and possession time */
+  var used = secsFor(p, g);
+  if(off && used) S.t[off].pos += used;
+  if(g.rules.clockMode === 'time'){
+    st.clock = Math.max(0, st.clock - used);
+    st.expired = st.clock <= 0;
+  }else if(p.t !== 'to' && p.t !== 'note' && p.t !== 'pen'){
+    st.playsLeft = Math.max(0, st.playsLeft - 1);
+    st.expired = st.playsLeft <= 0;
+  }
+  ev.pre = pre;
+  return ev;
+}
+
+/* Re-derive everything from the play list. */
+function derive(g){
+  var st = initState(g);
+  var S = { t: { away: newTeamStats(), home: newTeamStats() }, p: {} };
+  var rows = [], drives = [], drive = null;
+
+  function closeDrive(result, endSt){
+    if(!drive) return;
+    drive.result = result || drive.result || 'End of period';
+    drive.endYard = endSt.yard;
+    drives.push(drive);
+    drive = null;
+  }
+
+  for(var i = 0; i < g.plays.length; i++){
+    var p = g.plays[i];
+    var pre = clone(st);
+    var ev = applyPlay(st, p, g, S);
+    var post = clone(st);
+    rows.push({ i: i, p: p, pre: pre, post: post, ev: ev });
+
+    var scrim = ['run','pass','sack','kneel','spike','punt','fg','pen'].indexOf(p.t) >= 0;
+    if(scrim && pre.poss){
+      if(!drive || drive.team !== pre.poss){
+        closeDrive('End of period', pre);
+        drive = { team: pre.poss, startYard: pre.yard, startQtr: pre.qtr,
+                  startClock: pre.clock, plays: 0, yards: 0, secs: 0,
+                  result: null, from: i };
+      }
+      if(p.t !== 'pen') drive.plays++;
+      drive.secs += secsFor(p, g);
+      drive.yards = (post.poss === drive.team && post.yard != null)
+        ? post.yard - drive.startYard
+        : (ev.pre && ev.gain != null ? (ev.pre.yard + ev.gain) - drive.startYard : drive.yards);
+      if(pre.yard >= 80 && !drive.rz){ drive.rz = true; S.t[pre.poss].rz.t++; }
+      if(ev.end === 'td' || (ev.score && ev.score.team === drive.team && ev.score.kind === 'TD')){
+        if(drive.rz) S.t[drive.team].rz.td++;
+        closeDrive('Touchdown', post);
+      }else if(ev.end === 'fg'){
+        if(drive.rz) S.t[drive.team].rz.fg++;
+        closeDrive('Field goal', post);
+      }else if(ev.end === 'fgmiss' || ev.end === 'fgblock') closeDrive('Missed FG', post);
+      else if(ev.end === 'punt' || ev.end === 'touchback') closeDrive('Punt', post);
+      else if(ev.end === 'int') closeDrive('Interception', post);
+      else if(ev.end === 'fumble') closeDrive('Fumble', post);
+      else if(ev.end === 'downs') closeDrive('Downs', post);
+      else if(ev.end === 'safety') closeDrive('Safety', post);
+      else if(ev.end === 'blocked') closeDrive('Blocked punt', post);
+    }
+    if(p.t === 'endq' || p.t === 'final') closeDrive(p.t === 'final' ? 'End of game' : 'End of period', post);
+  }
+  closeDrive('In progress', st);
+  if(drives.length && drives[drives.length - 1].result === 'In progress'){}
+
+  /* first downs total */
+  ['away','home'].forEach(function(t){
+    S.t[t].fd.t = S.t[t].fd.r + S.t[t].fd.p + S.t[t].fd.n;
+    S.t[t].net = S.t[t].ry + S.t[t].py - S.t[t].sky;
+    S.t[t].to = S.t[t].fum.l + S.t[t].pint;
+  });
+  return { st: st, S: S, rows: rows, drives: drives };
+}
+
+/* NFL passer rating, for leagues that keep it */
+function rating(s){
+  if(!s.pa) return null;
+  var a = clamp((s.pc / s.pa - 0.3) * 5, 0, 2.375);
+  var b = clamp((s.py / s.pa - 3) * 0.25, 0, 2.375);
+  var c = clamp((s.ptd / s.pa) * 20, 0, 2.375);
+  var d = clamp(2.375 - (s.pint / s.pa * 25), 0, 2.375);
+  return ((a + b + c + d) / 6 * 100).toFixed(1);
+}
+
+/* ========================== describing a play ========================= */
+function describe(row){
+  var p = row.p, pre = row.pre, ev = row.ev, g = G();
+  var off = pre.poss;
+  if(ev.end === 'skipped')
+    return 'Out of sequence (' + p.t + ') — an earlier play was changed. Tap to correct or delete it.';
+  var N = function(t, id){ return pShort(t, id); };
+  var yds = function(y){ return Math.abs(y) + (Math.abs(y) === 1 ? ' yard' : ' yards'); };
+  var s;
+
+  switch(p.t){
+  case 'ko': {
+    var k = pre.kickTeam, r = other(k);
+    if(p.onside){
+      var who = p.onsideRec === 'k' ? k : r;
+      return 'Onside kick — recovered by ' + g.teams[who].abbr + '.';
+    }
+    if(p.touchback) return N(k, p.kicker) + ' kicks off, touchback.';
+    var ret = num(p.toYard, 0) - num(p.catchAt, 5);
+    s = N(k, p.kicker) + ' kicks off. ' + N(r, p.returner) + ' returns ' + yds(ret);
+    if(p.result === 'td') return s + ' for a TOUCHDOWN.';
+    if(p.result === 'fumlost') return s + ', FUMBLES, recovered by ' + g.teams[k].abbr + '.';
+    return s + '.';
+  }
+  case 'punt': {
+    if(p.blocked) return N(off, p.punter) + '’s punt is BLOCKED.';
+    s = N(off, p.punter) + ' punts ' + yds(num(p.gross, 42));
+    if(p.touchback || ev.end === 'touchback') return s + ', touchback.';
+    if(p.fairCatch) return s + ', fair catch.';
+    if(p.downed) return s + ', downed.';
+    var pr = num(p.retYards, 0);
+    s += '. ' + N(other(off), p.returner) + ' returns ' + yds(pr);
+    if(p.result === 'td') return s + ' for a TOUCHDOWN.';
+    if(p.result === 'fumlost') return s + ', FUMBLES, recovered by ' + g.teams[off].abbr + '.';
+    return s + '.';
+  }
+  case 'fg': {
+    var d = num(p.dist, (100 - pre.yard) + 17);
+    s = N(off, p.kicker) + ' ' + d + '-yard field goal is ';
+    return s + (p.good ? 'GOOD.' : (p.blocked ? 'BLOCKED.' : 'no good.'));
+  }
+  case 'xp': return N(pre.patTeam, p.kicker) + ' extra point is ' + (p.good ? 'GOOD.' : 'NO GOOD.');
+  case 'two': return 'Two-point conversion ' + (p.good ? 'is GOOD.' : 'FAILS.');
+  case 'kneel': return N(off, p.rusher) + ' kneels.';
+  case 'spike': return N(off, p.passer) + ' spikes the ball.';
+  case 'run': {
+    var gy = num(p.yards, 0);
+    s = N(off, p.rusher) + (gy < 0 ? ' loses ' + yds(gy) : (gy === 0 ? ' no gain' : ' rushes for ' + yds(gy)));
+    if(ev.end === 'td') return s + ' — TOUCHDOWN.';
+    if(ev.end === 'safety') return s + ' — SAFETY.';
+    if(p.result === 'fumlost') return s + ', FUMBLES, recovered by ' + g.teams[other(off)].abbr + '.';
+    if(p.oob) s += ' (out of bounds)';
+    return s + '.';
+  }
+  case 'sack': {
+    s = N(off, p.passer) + ' sacked by ' + N(other(off), p.defender) + ' for ' + yds(num(p.yards, 0)) + ' lost';
+    if(ev.end === 'safety') return s + ' — SAFETY.';
+    if(p.result === 'fumlost') return s + ', FUMBLES, recovered by ' + g.teams[other(off)].abbr + '.';
+    return s + '.';
+  }
+  case 'pass': {
+    var py = num(p.yards, 0);
+    if(p.result === 'int'){
+      s = N(off, p.passer) + ' pass INTERCEPTED by ' + N(other(off), p.defender);
+      var iy = num(p.retYards, 0);
+      if(iy) s += ', returned ' + yds(iy);
+      if(ev.score && ev.score.kind === 'INT TD') s += ' for a TOUCHDOWN';
+      return s + '.';
+    }
+    if(!p.complete) return N(off, p.passer) + ' pass incomplete' +
+      (p.receiver ? ' intended for ' + N(off, p.receiver) : '') + '.';
+    s = N(off, p.passer) + ' pass complete to ' + N(off, p.receiver) + ' for ' + yds(py);
+    if(ev.end === 'td') return s + ' — TOUCHDOWN.';
+    if(p.result === 'fumlost') return s + ', FUMBLES, recovered by ' + g.teams[other(off)].abbr + '.';
+    return s + '.';
+  }
+  case 'pen': {
+    var team = p.on === 'o' ? off : other(off);
+    s = 'PENALTY, ' + g.teams[team].abbr + (p.name ? ' — ' + p.name : '') + ', ' + num(p.yards, 5) + ' yards';
+    if(p.player) s += ' on ' + N(team, p.player);
+    if(p.auto1st) s += ' (automatic first down)';
+    if(p.lossDown) s += ' (loss of down)';
+    return s + '.';
+  }
+  case 'to': return 'Timeout, ' + g.teams[p.team].abbr + '.';
+  case 'clock': return 'Clock set ' + plus(num(p.delta, 0)) + 's.';
+  case 'endq': return 'End of ' + ord(pre.qtr) + ' quarter.';
+  case 'final': return 'End of game.';
+  case 'note': return p.note || 'Note.';
+  }
+  return '';
+}
+
+function situation(pre, g){
+  var bits = [];
+  bits.push('Q' + pre.qtr);
+  bits.push(g.rules.clockMode === 'time' ? mmss(pre.clock) : pre.playsLeft + 'p');
+  if(pre.phase === 'scrimmage' && pre.poss != null){
+    var goal = pre.yard + pre.toGo >= 100;
+    bits.push(ord(pre.down) + '&' + (goal ? 'G' : pre.toGo));
+    bits.push(fmtSpot(pre.yard, pre.poss));
+  }else if(pre.phase === 'kickoff') bits.push(pre.freeKick ? 'Free kick' : 'Kickoff');
+  else if(pre.phase === 'pat') bits.push('Try');
+  return bits.join(' · ');
+}
+
+/* ============================== rendering ============================= */
+var D = null;                     /* the derived game, refreshed on render */
+var pad = null;                   /* the play being built in the pad       */
+
+function render(){
+  var g = G();
+  D = derive(g);
+  renderBoard(g, D.st);
+  renderField(g, D.st);
+  renderLog(g, D);
+  renderPad(g, D.st);
+}
+
+function renderBoard(g, st){
+  ['away','home'].forEach(function(t){
+    var side = $('side' + (t === 'away' ? 'Away' : 'Home'));
+    side.style.setProperty('--tc', g.teams[t].color);
+    $('abbr' + (t === 'away' ? 'Away' : 'Home')).textContent = g.teams[t].abbr || t.toUpperCase();
+    $('pts' + (t === 'away' ? 'Away' : 'Home')).textContent = st.score[t];
+    var holder = (st.phase === 'pat' ? st.patTeam : st.poss);
+    side.classList.toggle('poss', holder === t);
+    var tos = $('tos' + (t === 'away' ? 'Away' : 'Home'));
+    tos.textContent = '';
+    for(var i = 0; i < g.rules.timeouts; i++){
+      var d = el('div', 'to' + (i < st.to[t] ? ' on' : ''));
+      tos.appendChild(d);
+    }
+  });
+  $('vQtr').textContent = st.qtr >= 5 ? (st.qtr === 5 ? 'OT' : 'OT' + (st.qtr - 4)) : st.qtr;
+  if(g.rules.clockMode === 'time'){
+    $('kClock').textContent = 'Clock';
+    $('vClock').textContent = mmss(st.clock);
+  }else{
+    $('kClock').textContent = 'Plays left';
+    $('vClock').textContent = st.playsLeft;
+  }
+  $('cellClock').classList.toggle('expired', !!st.expired);
+  $('vDD').textContent = fmtDD(st);
+  $('vSpot').textContent = st.phase === 'scrimmage' && st.poss ? fmtSpot(st.yard, st.poss) : '—';
+}
+
+function renderField(g, st){
+  var marks = $('marks');
+  if(!marks.dataset.done){
+    /* 10% each end zone, so the playing field runs 10%..90% */
+    for(var y = 5; y <= 95; y += 5){
+      var m = el('div', 'yl' + (y % 10 ? ' five' : ''));
+      m.style.left = (10 + y * 0.8) + '%';
+      marks.appendChild(m);
+    }
+    for(var n = 10; n <= 90; n += 10){
+      var lab = el('div', 'ynum', String(n > 50 ? 100 - n : n));
+      lab.style.left = (10 + n * 0.8) + '%';
+      marks.appendChild(lab);
+    }
+    marks.dataset.done = '1';
+  }
+  var live = st.phase === 'scrimmage' && st.poss != null;
+  var off = live ? st.poss : (st.phase === 'pat' ? st.patTeam : other(st.kickTeam));
+  $('ezL').textContent = g.teams[off || 'away'].abbr;
+  $('ezR').textContent = g.teams[other(off || 'away')].abbr;
+  $('field').style.setProperty('--tc', g.teams[off || 'away'].color);
+
+  $('losLine').hidden = !live;
+  $('ballMark').hidden = !live;
+  $('togoLine').hidden = !live;
+  if(live){
+    var px = 10 + st.yard * 0.8;
+    $('losLine').style.left = px + '%';
+    $('ballMark').style.left = px + '%';
+    var tg = st.yard + st.toGo;
+    if(tg >= 100){ $('togoLine').hidden = true; }
+    else $('togoLine').style.left = (10 + tg * 0.8) + '%';
+  }
+  var dd = $('ddBig'), sp = $('spotBig');
+  if(live){
+    dd.textContent = fmtDD(st);
+    sp.textContent = fmtSpot(st.yard, st.poss);
+  }else if(st.phase === 'kickoff'){
+    dd.textContent = st.freeKick ? 'Free kick' : 'Kickoff';
+    sp.textContent = g.teams[st.kickTeam].abbr + ' kicking';
+  }else if(st.phase === 'pat'){
+    dd.textContent = 'Try';
+    sp.textContent = g.teams[st.patTeam].abbr;
+  }else{ dd.textContent = 'Final'; sp.textContent = ''; }
+
+  var cur = D.drives.length ? D.drives[D.drives.length - 1] : null;
+  if(cur && cur.result === 'In progress' && live){
+    $('driveNow').textContent = 'Drive: ' + cur.plays + ' plays, ' +
+      plus(cur.yards) + ' yds, ' + mmss(cur.secs) + ' — from ' +
+      fmtSpot(cur.startYard, cur.team);
+  }else $('driveNow').textContent = '';
+}
+
+function renderLog(g, D){
+  var box = $('log');
+  box.textContent = '';
+  if(!D.rows.length){
+    var e = el('div');
+    e.id = 'logEmpty';
+    e.textContent = 'No plays yet. Set the two clubs up in Menu → Teams, then record the opening kickoff.';
+    box.appendChild(e);
+    return;
+  }
+  var qtrSeen = 0;
+  for(var i = 0; i < D.rows.length; i++){
+    var r = D.rows[i];
+    if(r.pre.qtr !== qtrSeen){
+      qtrSeen = r.pre.qtr;
+      var sep = el('div', 'lsep');
+      sep.appendChild(el('span', null, qtrSeen >= 5 ? 'Overtime' : ord(qtrSeen) + ' quarter'));
+      sep.appendChild(el('span', 'r', g.teams.away.abbr + ' ' + r.pre.score.away + '  ·  ' +
+        g.teams.home.abbr + ' ' + r.pre.score.home));
+      box.appendChild(sep);
+    }
+    var row = el('div', 'lrow');
+    if(r.ev.end === 'skipped') row.className += ' turn';
+    else if(r.ev.score) row.className += ' score';
+    else if(r.ev.turnover) row.className += ' turn';
+    else if(r.ev.first) row.className += ' first';
+    row.appendChild(el('div', 'sit', situation(r.pre, g)));
+    row.appendChild(el('div', 'txt', describe(r)));
+    var tail = '';
+    if(r.ev.score) tail = '+' + r.ev.score.pts + ' ' + g.teams[r.ev.score.team].abbr;
+    else if(r.ev.first) tail = '1st';
+    else if(r.ev.gain != null) tail = plus(r.ev.gain);
+    row.appendChild(el('div', 'gn', tail));
+    (function(idx){ row.addEventListener('click', function(){ openEdit(idx); }); })(i);
+    box.appendChild(row);
+  }
+  box.scrollTop = box.scrollHeight;
+}
+
+/* ============================== the pad =============================== */
+var padOpen = {};                 /* which "show the whole roster" chips are open */
+
+function mkBtn(txt, on, fn, cls){
+  var b = el('button', 'btn' + (cls ? ' ' + cls : '') + (on ? ' on' : ''), txt);
+  b.addEventListener('click', fn);
+  return b;
+}
+function mkGrp(label){
+  var d = el('div', 'grp');
+  if(label) d.appendChild(el('div', 'glab', label));
+  var r = el('div', 'row');
+  d.appendChild(r);
+  return { d: d, r: r };
+}
+function chipFor(team, pl, on, fn){
+  var c = el('button', 'chip' + (on ? ' on' : ''));
+  c.appendChild(el('span', 'n', '#' + pl.num));
+  c.appendChild(el('span', null, pl.name || pl.pos));
+  c.addEventListener('click', fn);
+  return c;
+}
+/* a row of player chips, filtered to the positions that usually do this */
+function mkPlayers(host, label, team, key, positions){
+  var g = G();
+  var grp = mkGrp(label + ' — ' + g.teams[team].abbr);
+  var all = padOpen[key];
+  var list = roster(team).filter(function(p){
+    return all || positions.indexOf(p.pos.toUpperCase()) >= 0;
+  });
+  if(!list.length) list = roster(team);
+  list.forEach(function(pl){
+    grp.r.appendChild(chipFor(team, pl, pad[key] === pl.id, function(){
+      pad[key] = pad[key] === pl.id ? null : pl.id;
+      renderPadCtx();
+    }));
+  });
+  var more = el('button', 'chip', all ? '− fewer' : '+ all');
+  more.addEventListener('click', function(){ padOpen[key] = !all; renderPadCtx(); });
+  grp.r.appendChild(more);
+  host.appendChild(grp.d);
+}
+/* the big yardage stepper. Several can share one panel, so each carries
+   its own key rather than a single well-known id. */
+function mkYards(host, label, key, dflt){
+  var grp = mkGrp(label);
+  var box = el('div');
+  box.id = 'yardBox';
+  box.dataset.key = key;
+  if(pad[key] == null) pad[key] = (dflt || 0);
+  [[-10,'\u221210'],[-5,'\u22125'],[-1,'\u22121']].forEach(function(s){
+    box.appendChild(mkBtn(s[1], false, function(){ bump(key, s[0]); }, 'step'));
+  });
+  var inp = el('input');
+  inp.id = 'yv_' + key;
+  inp.className = 'yardVal';
+  inp.type = 'text';
+  inp.inputMode = 'numeric';
+  inp.value = String(pad[key]);
+  if(pad[key] < 0) inp.classList.add('neg');
+  inp.addEventListener('focus', function(){ inp.select(); });
+  inp.addEventListener('input', function(){
+    var v = parseInt(inp.value.replace(/[^\-0-9]/g, ''), 10);
+    pad[key] = isNaN(v) ? 0 : v;
+    inp.classList.toggle('neg', pad[key] < 0);
+    refreshPreview();
+  });
+  box.appendChild(inp);
+  [[1,'+1'],[5,'+5'],[10,'+10']].forEach(function(s){
+    box.appendChild(mkBtn(s[1], false, function(){ bump(key, s[0]); }, 'step'));
+  });
+  grp.d.appendChild(box);
+  grp.r.remove();
+  host.appendChild(grp.d);
+}
+function bump(key, by){
+  pad[key] = num(pad[key], 0) + by;
+  var v = $('yv_' + key);
+  if(v){ v.value = String(pad[key]); v.classList.toggle('neg', pad[key] < 0); }
+  refreshPreview();
+}
+function mkToggle(host, defs){
+  var grp = mkGrp(null);
+  defs.forEach(function(d){
+    grp.r.appendChild(mkBtn(d[1], !!pad[d[0]], function(){
+      pad[d[0]] = !pad[d[0]];
+      if(pad[d[0]] && d[3]) d[3]();
+      renderPadCtx();
+    }, d[2] || ''));
+  });
+  host.appendChild(grp.d);
+}
+function mkMini(host, label, key, dflt, wide){
+  var w = el('div', 'inline');
+  w.style.flex = wide ? '1 1 100%' : '1 1 0';
+  w.appendChild(el('span', 'k', label));
+  var i = el('input', 'mini');
+  i.value = pad[key] != null ? pad[key] : (dflt != null ? dflt : '');
+  i.inputMode = 'numeric';
+  i.addEventListener('input', function(){ pad[key] = i.value; refreshPreview(); });
+  w.appendChild(i);
+  host.appendChild(w);
+}
+
+/* what the board will read once this play is recorded */
+function preview(){
+  if(!pad || !pad.t) return null;
+  var g = clone(G());
+  g.plays.push(clone(pad));
+  try{ return derive(g); }catch(e){ return null; }
+}
+function refreshPreview(){
+  var d = preview();
+  var nxt = $('commitNext');
+  if(!d){ nxt.textContent = ''; return; }
+  var st = d.st, g = G();
+  var bits;
+  if(st.phase === 'scrimmage') bits = fmtDD(st) + ' at ' + fmtSpot(st.yard, st.poss);
+  else if(st.phase === 'kickoff') bits = (st.freeKick ? 'Free kick' : 'Kickoff') + ', ' + g.teams[st.kickTeam].abbr;
+  else if(st.phase === 'pat') bits = 'Try, ' + g.teams[st.patTeam].abbr;
+  else bits = 'Final';
+  var scored = (st.score.away - D.st.score.away) + (st.score.home - D.st.score.home);
+  nxt.textContent = (scored ? '\u25cf ' : '') + '\u2192 ' + bits;
+}
+
+function setType(t){
+  var st = D.st, g = G();
+  var off = st.poss, def = off ? other(off) : null;
+  pad = { t: t, id: uid('pl') };
+  switch(t){
+  case 'run':   pad.rusher = firstAt(off, ['RB','FB']); pad.yards = 0; break;
+  case 'pass':  pad.passer = firstAt(off, ['QB']); pad.complete = true; pad.yards = 0; break;
+  case 'sack':  pad.passer = firstAt(off, ['QB']); pad.yards = -7; break;
+  case 'punt':  pad.punter = firstAt(off, ['P','K']); pad.gross = 42;
+                pad.returner = firstAt(def, ['WR','CB','RB']); pad.fairCatch = true; break;
+  case 'fg':    pad.kicker = firstAt(off, ['K']); pad.dist = (100 - st.yard) + 17; pad.good = true; break;
+  case 'ko':    pad.kicker = firstAt(st.kickTeam, ['K']); pad.touchback = true;
+                pad.catchAt = 5; pad.toYard = 25;
+                pad.returner = firstAt(other(st.kickTeam), ['WR','RB','CB']); break;
+  case 'xp':    pad.kicker = firstAt(st.patTeam, ['K']); pad.good = true; break;
+  case 'two':   pad.good = true; break;
+  case 'pen':   pad.on = 'd'; pad.yards = 5; break;
+  case 'kneel': pad.rusher = firstAt(off, ['QB']); pad.yards = -1; break;
+  case 'spike': pad.passer = firstAt(off, ['QB']); break;
+  case 'to':    pad.team = off || 'away'; break;
+  }
+  renderPadCtx();
+}
+
+function renderPad(g, st){
+  var who = $('padWho'), hint = $('padHint');
+  if(st.phase === 'final'){
+    who.textContent = 'Final';
+    who.style.color = 'var(--ink)';
+    hint.textContent = g.teams.away.abbr + ' ' + st.score.away + ' — ' + g.teams.home.abbr + ' ' + st.score.home;
+  }else{
+    var holder = st.phase === 'pat' ? st.patTeam : (st.phase === 'kickoff' ? st.kickTeam : st.poss);
+    who.textContent = holder ? g.teams[holder].name : '—';
+    who.style.color = holder ? g.teams[holder].color : 'var(--ink)';
+    hint.textContent = st.phase === 'kickoff'
+      ? (st.freeKick ? 'free kick from the 20' : 'kicking off from the ' + g.rules.koFrom)
+      : st.phase === 'pat' ? 'after the touchdown'
+      : fmtDD(st) + ' at ' + fmtSpot(st.yard, st.poss);
+  }
+
+  /* which plays are legal right now */
+  var types;
+  if(st.phase === 'kickoff') types = [['ko','Kickoff']];
+  else if(st.phase === 'pat') types = [['xp','Extra point'],['two','Two-point']];
+  else if(st.phase === 'final') types = [];
+  else types = [['run','Run'],['pass','Pass'],['sack','Sack'],['punt','Punt'],['fg','Field goal']];
+
+  var row = $('rowType');
+  row.textContent = '';
+  if(!pad || types.length && !types.some(function(x){ return x[0] === pad.t; }) &&
+     ['pen','kneel','spike','to','note'].indexOf(pad.t) < 0){
+    setTypeSilent(types.length ? types[0][0] : 'note');
+  }
+  types.forEach(function(t){
+    row.appendChild(mkBtn(t[1], pad.t === t[0], function(){ setType(t[0]); }, 'wide'));
+  });
+  var extra = [['pen','Penalty']];
+  if(st.phase === 'scrimmage'){ extra.push(['kneel','Kneel']); extra.push(['spike','Spike']); }
+  extra.push(['to','Timeout']);
+  extra.push(['note','Note']);
+  extra.forEach(function(t){
+    row.appendChild(mkBtn(t[1], pad.t === t[0], function(){ setType(t[0]); }, 'sm'));
+  });
+  if(st.expired && st.phase !== 'final'){
+    row.appendChild(mkBtn(st.qtr >= 4 ? 'End game' : 'End quarter', false, function(){
+      commitRaw({ t: st.qtr >= 4 ? 'final' : 'endq', id: uid('pl') });
+    }, 'sm good on'));
+  }else if(st.phase !== 'final'){
+    row.appendChild(mkBtn('End qtr', false, function(){
+      commitRaw({ t: 'endq', id: uid('pl') });
+    }, 'sm'));
+  }
+  renderPadCtx();
+}
+function setTypeSilent(t){ setType(t); }
+
+function renderPadCtx(){
+  var host = $('grpCtx');
+  if(!host) return;
+  host.textContent = '';
+  var g = G(), st = D.st;
+  var off = st.poss, def = off ? other(off) : null;
+
+  switch(pad.t){
+
+  case 'ko': {
+    var kick = st.kickTeam, recv = other(kick);
+    mkPlayers(host, 'Kicker', kick, 'kicker', ['K','P']);
+    mkToggle(host, [
+      ['touchback','Touchback', 'wide', function(){ pad.onside = false; }],
+      ['onside','Onside', 'wide', function(){ pad.touchback = false; }]
+    ]);
+    if(pad.onside){
+      var og = mkGrp('Recovered by');
+      og.r.appendChild(mkBtn(g.teams[kick].abbr + ' (kicking)', pad.onsideRec === 'k', function(){
+        pad.onsideRec = 'k'; renderPadCtx();
+      }, 'wide'));
+      og.r.appendChild(mkBtn(g.teams[recv].abbr + ' (receiving)', pad.onsideRec !== 'k', function(){
+        pad.onsideRec = 'r'; renderPadCtx();
+      }, 'wide'));
+      host.appendChild(og.d);
+      mkYards(host, 'Recovered on their own', 'spot', 48);
+    }else if(!pad.touchback){
+      mkPlayers(host, 'Returner', recv, 'returner', ['WR','RB','CB','S']);
+      mkYards(host, 'Caught on their own', 'catchAt', 5);
+      mkYards(host, 'Returned to their own', 'toYard', 25);
+      mkToggle(host, [
+        ['_td','Return TD','good', function(){ pad.result = 'td'; }],
+        ['_fum','Fumble lost','danger', function(){ pad.result = 'fumlost'; }]
+      ]);
+      pad.result = pad._td ? 'td' : (pad._fum ? 'fumlost' : null);
+    }
+    break;
+  }
+
+  case 'punt': {
+    mkPlayers(host, 'Punter', off, 'punter', ['P','K']);
+    mkYards(host, 'Punt distance', 'gross', 42);
+    mkToggle(host, [
+      ['touchback','Touchback','wide'],
+      ['fairCatch','Fair catch','wide'],
+      ['downed','Downed','wide'],
+      ['blocked','Blocked','danger']
+    ]);
+    if(pad.blocked){
+      var bg = mkGrp('Recovered by');
+      bg.r.appendChild(mkBtn(g.teams[off].abbr + ' (kicking)', pad.blockRec !== 'd', function(){
+        pad.blockRec = 'o'; renderPadCtx();
+      }, 'wide'));
+      bg.r.appendChild(mkBtn(g.teams[def].abbr + ' (rushing)', pad.blockRec === 'd', function(){
+        pad.blockRec = 'd'; renderPadCtx();
+      }, 'wide'));
+      host.appendChild(bg.d);
+      mkYards(host, 'Recovered on ' + g.teams[off].abbr + ' own', 'spot', st.yard);
+    }else if(!pad.touchback && !pad.fairCatch && !pad.downed){
+      mkPlayers(host, 'Returner', def, 'returner', ['WR','RB','CB','S']);
+      mkYards(host, 'Return yards', 'retYards', 0);
+      mkToggle(host, [
+        ['_td','Return TD','good'],
+        ['_fum','Fumble lost','danger']
+      ]);
+      pad.result = pad._td ? 'td' : (pad._fum ? 'fumlost' : null);
+    }
+    break;
+  }
+
+  case 'fg': {
+    mkPlayers(host, 'Kicker', off, 'kicker', ['K']);
+    mkYards(host, 'Attempt length (yards)', 'dist', (100 - st.yard) + 17);
+    var fg = mkGrp('Result');
+    fg.r.appendChild(mkBtn('Good', !!pad.good, function(){
+      pad.good = true; pad.blocked = false; renderPadCtx();
+    }, 'wide good'));
+    fg.r.appendChild(mkBtn('No good', !pad.good && !pad.blocked, function(){
+      pad.good = false; pad.blocked = false; renderPadCtx();
+    }, 'wide'));
+    fg.r.appendChild(mkBtn('Blocked', !!pad.blocked, function(){
+      pad.good = false; pad.blocked = true; renderPadCtx();
+    }, 'wide danger'));
+    host.appendChild(fg.d);
+    break;
+  }
+
+  case 'xp': {
+    mkPlayers(host, 'Kicker', st.patTeam, 'kicker', ['K']);
+    var xg = mkGrp('Result');
+    xg.r.appendChild(mkBtn('Good', !!pad.good, function(){ pad.good = true; renderPadCtx(); }, 'wide good'));
+    xg.r.appendChild(mkBtn('No good', !pad.good, function(){ pad.good = false; renderPadCtx(); }, 'wide'));
+    host.appendChild(xg.d);
+    break;
+  }
+
+  case 'two': {
+    var tg = mkGrp('Result');
+    tg.r.appendChild(mkBtn('Converted', !!pad.good, function(){ pad.good = true; renderPadCtx(); }, 'wide good'));
+    tg.r.appendChild(mkBtn('Failed', !pad.good, function(){ pad.good = false; renderPadCtx(); }, 'wide'));
+    host.appendChild(tg.d);
+    host.appendChild(el('div', 'note',
+      'Conversion plays are scored but, as in the league books, are kept out of the rushing and receiving totals.'));
+    break;
+  }
+
+  case 'run': case 'kneel': {
+    mkPlayers(host, 'Ball carrier', off, 'rusher', ['RB','FB','QB','WR','TE']);
+    mkYards(host, 'Yards gained', 'yards', 0);
+    mkToggle(host, [
+      ['oob','Out of bounds'],
+      ['fumble','Fumbled'],
+      ['_fum','Fumble LOST','danger']
+    ]);
+    pad.result = pad._fum ? 'fumlost' : null;
+    if(pad._fum){
+      mkPlayers(host, 'Recovered by', def, 'defender', ['LB','CB','S','DE','DT']);
+      mkYards(host, 'Return yards', 'retYards', 0);
+    }
+    break;
+  }
+
+  case 'pass': {
+    mkPlayers(host, 'Passer', off, 'passer', ['QB']);
+    var cg = mkGrp('Result');
+    cg.r.appendChild(mkBtn('Complete', !!pad.complete && !pad._int, function(){
+      pad.complete = true; pad._int = false; pad.result = null; renderPadCtx();
+    }, 'wide good'));
+    cg.r.appendChild(mkBtn('Incomplete', !pad.complete && !pad._int, function(){
+      pad.complete = false; pad._int = false; pad.result = null; renderPadCtx();
+    }, 'wide'));
+    cg.r.appendChild(mkBtn('Intercepted', !!pad._int, function(){
+      pad._int = true; pad.complete = false; pad.result = 'int'; renderPadCtx();
+    }, 'wide danger'));
+    host.appendChild(cg.d);
+    if(pad._int){
+      pad.result = 'int';
+      mkPlayers(host, 'Intercepted by', def, 'defender', ['CB','S','LB','DE']);
+      mkYards(host, 'Picked off, yards past the line', 'yards', 8);
+      mkYards(host, 'Return yards', 'retYards', 0);
+    }else{
+      mkPlayers(host, 'Receiver', off, 'receiver', ['WR','TE','RB','FB']);
+      if(pad.complete){
+        mkYards(host, 'Yards gained', 'yards', 0);
+        mkToggle(host, [
+          ['oob','Out of bounds'],
+          ['_fum','Fumble LOST','danger']
+        ]);
+        pad.result = pad._fum ? 'fumlost' : null;
+        if(pad._fum){
+          mkPlayers(host, 'Recovered by', def, 'defender', ['LB','CB','S','DE','DT']);
+          mkYards(host, 'Return yards', 'retYards', 0);
+        }
+      }else{
+        pad.yards = 0;
+      }
+    }
+    break;
+  }
+
+  case 'sack': {
+    mkPlayers(host, 'Quarterback', off, 'passer', ['QB']);
+    mkPlayers(host, 'Sacked by', def, 'defender', ['DE','DT','LB','S','CB']);
+    mkYards(host, 'Yards lost', 'yards', -7);
+    mkToggle(host, [['_fum','Fumble LOST','danger']]);
+    pad.result = pad._fum ? 'fumlost' : null;
+    if(pad._fum) mkYards(host, 'Return yards', 'retYards', 0);
+    break;
+  }
+
+  case 'spike': {
+    mkPlayers(host, 'Quarterback', off, 'passer', ['QB']);
+    host.appendChild(el('div', 'note', 'Counts as a pass attempt and burns the down.'));
+    break;
+  }
+
+  case 'pen': {
+    var og2 = mkGrp('Called on');
+    og2.r.appendChild(mkBtn(g.teams[off].abbr + ' (offence)', pad.on === 'o', function(){
+      pad.on = 'o'; renderPadCtx();
+    }, 'wide'));
+    og2.r.appendChild(mkBtn(g.teams[def].abbr + ' (defence)', pad.on === 'd', function(){
+      pad.on = 'd'; renderPadCtx();
+    }, 'wide'));
+    host.appendChild(og2.d);
+    var yg = mkGrp('Yards');
+    [5, 10, 15].forEach(function(y){
+      yg.r.appendChild(mkBtn(String(y), num(pad.yards, 5) === y, function(){
+        pad.yards = y; renderPadCtx();
+      }, 'wide'));
+    });
+    host.appendChild(yg.d);
+    mkYards(host, 'Or set exactly', 'yards', 5);
+    mkToggle(host, [
+      ['auto1st','Automatic 1st'],
+      ['lossDown','Loss of down']
+    ]);
+    var ng = mkGrp('Foul');
+    var ni = el('input', 'mini');
+    ni.inputMode = 'text';
+    ni.placeholder = 'holding, offside, pass interference…';
+    ni.value = pad.name || '';
+    ni.addEventListener('input', function(){ pad.name = ni.value; });
+    ng.r.appendChild(ni);
+    host.appendChild(ng.d);
+    mkPlayers(host, 'On', pad.on === 'o' ? off : def, 'player', ['QB','RB','WR','TE','LB','CB','S','DE','DT','FB']);
+    break;
+  }
+
+  case 'to': {
+    var tg2 = mkGrp('Timeout');
+    ['away','home'].forEach(function(t){
+      tg2.r.appendChild(mkBtn(g.teams[t].abbr + '  (' + st.to[t] + ' left)', pad.team === t, function(){
+        pad.team = t; renderPadCtx();
+      }, 'wide'));
+    });
+    host.appendChild(tg2.d);
+    break;
+  }
+
+  case 'note': {
+    var ng2 = mkGrp('Note for the sheet');
+    var ta = el('input', 'mini');
+    ta.inputMode = 'text';
+    ta.placeholder = 'injury, card used, anything worth remembering';
+    ta.value = pad.note || '';
+    ta.addEventListener('input', function(){ pad.note = ta.value; });
+    ng2.r.appendChild(ta);
+    host.appendChild(ng2.d);
+    break;
+  }
+  }
+
+  /* seconds override, for anyone keeping the clock by hand */
+  if(['to','note','endq','final'].indexOf(pad.t) < 0 && G().rules.clockMode === 'time'){
+    var sg = mkGrp('Clock');
+    var si = el('input', 'mini');
+    si.inputMode = 'numeric';
+    si.style.maxWidth = '110px';
+    si.placeholder = secsFor(pad, G()) + 's';
+    si.value = pad.secs != null ? pad.secs : '';
+    si.addEventListener('input', function(){ pad.secs = si.value; refreshPreview(); });
+    sg.r.appendChild(si);
+    sg.r.appendChild(el('span', 'note', 'seconds off the clock — blank uses the table in Setup'));
+    host.appendChild(sg.d);
+  }
+
+  $('dieW').textContent = pad.dW || '—';
+  $('dieR').textContent = pad.dR || '—';
+  $('inPRN').value = pad.prn || '';
+  $('inDef').value = pad.defCall || '';
+  $('commitLab').textContent = 'Record play';
+  refreshPreview();
+}
+
+/* ============================ recording ============================== */
+var editIndex = -1;
+
+function commitRaw(p){
+  G().plays.push(p);
+  saveDB();
+  render();
+}
+function commitPad(){
+  if(!pad || !pad.t) return;
+  var p = clone(pad);
+  p.prn = $('inPRN').value || '';
+  p.defCall = $('inDef').value || '';
+  if(p.secs === '') delete p.secs;
+  var g = G();
+  if(editIndex >= 0){
+    p.id = g.plays[editIndex].id;
+    g.plays[editIndex] = p;
+    editIndex = -1;
+    saveDB(); render();
+    toast('Play updated.', 'good');
+    return;
+  }
+  g.plays.push(p);
+  saveDB();
+  var keep = (['run','pass'].indexOf(p.t) >= 0) ? p.t : null;
+  render();
+  if(keep && D.st.phase === 'scrimmage') setType(keep);
+  var last = D.rows[D.rows.length - 1];
+  if(last && last.ev.score) toast(G().teams[last.ev.score.team].abbr + ' ' + last.ev.score.kind + ' — ' +
+    G().teams.away.abbr + ' ' + D.st.score.away + ', ' + G().teams.home.abbr + ' ' + D.st.score.home, 'good');
+}
+function undo(){
+  var g = G();
+  if(!g.plays.length){ toast('Nothing to undo.'); return; }
+  var p = g.plays.pop();
+  saveDB(); render();
+  toast('Took back: ' + (p.t === 'note' ? 'note' : p.t) + '.');
+}
+
+/* --------------------------- edit one play --------------------------- */
+function openEdit(i){
+  var r = D.rows[i], g = G();
+  var b = $('editBody');
+  b.textContent = '';
+  var h = el('div', 'note');
+  h.innerHTML = '';
+  b.appendChild(el('h3', 'sec', situation(r.pre, g)));
+  var p = el('div');
+  p.style.fontSize = '17px';
+  p.style.marginBottom = '14px';
+  p.textContent = describe(r);
+  b.appendChild(p);
+  var det = [];
+  if(r.p.prn) det.push('PRN ' + r.p.prn);
+  if(r.p.dW || r.p.dR) det.push('dice ' + (r.p.dW || '?') + '-' + (r.p.dR || '?'));
+  if(r.p.defCall) det.push('defence ' + r.p.defCall);
+  det.push(secsFor(r.p, g) + 's off the clock');
+  b.appendChild(el('div', 'note', det.join('  ·  ')));
+
+  var row = el('div', 'row');
+  row.style.marginTop = '18px';
+  row.appendChild(mkBtn('Load into the pad and correct it', false, function(){
+    editIndex = i;
+    pad = clone(r.p);
+    $('ovEdit').hidden = true;
+    renderPadCtx();
+    $('commitLab').textContent = 'Update play';
+    toast('Correcting play ' + (i + 1) + ' — record to replace it.');
+  }, 'wide'));
+  b.appendChild(row);
+  $('editDelete').onclick = function(){
+    G().plays.splice(i, 1);
+    saveDB(); render();
+    $('ovEdit').hidden = true;
+    toast('Play removed.');
+  };
+  $('ovEdit').hidden = false;
+}
+
+/* ============================== box score ============================= */
+function statRows(D, team, kind){
+  var out = [];
+  for(var k in D.S.p){
+    if(k.indexOf(team + ':') !== 0) continue;
+    var s = D.S.p[k], pid = k.slice(team.length + 1);
+    var keep =
+      kind === 'pass' ? s.pa > 0 :
+      kind === 'rush' ? s.ra > 0 :
+      kind === 'rec'  ? s.tgt > 0 :
+      kind === 'kick' ? (s.fga + s.xpa + s.pn) > 0 :
+      kind === 'ret'  ? (s.kr + s.pr) > 0 :
+      /* defence */     (s.dint + s.dsack + s.dfr) > 0;
+    if(keep) out.push({ pid: pid, s: s, name: pLabel(team, pid) || pShort(team, pid) });
+  }
+  return out;
+}
+function tbl(host, head, rows, totals){
+  var wrap = el('div', 'tw');
+  var t = el('table');
+  var thead = el('tr');
+  head.forEach(function(h){ thead.appendChild(el('th', null, h)); });
+  t.appendChild(thead);
+  rows.forEach(function(r){
+    var tr = el('tr');
+    r.forEach(function(c){ tr.appendChild(el('td', null, String(c))); });
+    t.appendChild(tr);
+  });
+  if(totals){
+    var tr2 = el('tr', 'tot');
+    totals.forEach(function(c){ tr2.appendChild(el('td', null, String(c))); });
+    t.appendChild(tr2);
+  }
+  wrap.appendChild(t);
+  host.appendChild(wrap);
+}
+function avg(a, b){ return b ? (a / b).toFixed(1) : '0.0'; }
+
+function renderBox(){
+  var g = G(), d = D, b = $('boxBody');
+  b.textContent = '';
+
+  /* line score */
+  var qs = d.st.line.away.length;
+  var head = ['']; for(var i = 0; i < qs; i++) head.push(i >= 4 ? 'OT' + (i - 3) : String(i + 1));
+  head.push('T');
+  var lrows = ['away','home'].map(function(t){
+    return [g.teams[t].abbr].concat(d.st.line[t].map(String)).concat([d.st.score[t]]);
+  });
+  var wrap = el('div', 'tw');
+  var lt = el('table', 'linescore');
+  var hr = el('tr'); head.forEach(function(h){ hr.appendChild(el('th', null, h)); }); lt.appendChild(hr);
+  lrows.forEach(function(r){ var tr = el('tr'); r.forEach(function(c){ tr.appendChild(el('td', null, String(c))); }); lt.appendChild(tr); });
+  wrap.appendChild(lt); b.appendChild(wrap);
+
+  /* scoring summary */
+  b.appendChild(el('h3', 'sec', 'Scoring'));
+  var any = false;
+  d.rows.forEach(function(r){
+    if(!r.ev.score) return;
+    any = true;
+    var line = el('div', 'drv sc');
+    var h2 = el('div', 'h');
+    h2.appendChild(el('span', 'tm', g.teams[r.ev.score.team].abbr));
+    h2.appendChild(el('span', 'rs', r.ev.score.kind));
+    h2.appendChild(el('span', 'dt', 'Q' + r.pre.qtr + ' ' +
+      (g.rules.clockMode === 'time' ? mmss(r.pre.clock) : '')));
+    line.appendChild(h2);
+    line.appendChild(el('div', 'dt', describe(r) + '  (' +
+      g.teams.away.abbr + ' ' + r.post.score.away + ', ' + g.teams.home.abbr + ' ' + r.post.score.home + ')'));
+    b.appendChild(line);
+  });
+  if(!any) b.appendChild(el('div', 'note', 'No points yet.'));
+
+  /* team stats */
+  b.appendChild(el('h3', 'sec', 'Team statistics'));
+  var A = d.S.t.away, H = d.S.t.home;
+  var lines = [
+    ['First downs', A.fd.t, H.fd.t],
+    ['\u2003\u2003by rush / pass / penalty', A.fd.r + '-' + A.fd.p + '-' + A.fd.n, H.fd.r + '-' + H.fd.p + '-' + H.fd.n],
+    ['Total net yards', A.net, H.net],
+    ['Total plays', A.plays, H.plays],
+    ['Yards per play', avg(A.net, A.plays), avg(H.net, H.plays)],
+    ['Net yards rushing', A.ry, H.ry],
+    ['\u2003\u2003rushes / average', A.ra + ' / ' + avg(A.ry, A.ra), H.ra + ' / ' + avg(H.ry, H.ra)],
+    ['Net yards passing', A.py - A.sky, H.py - H.sky],
+    ['\u2003\u2003comp-att-int', A.pc + '-' + A.pa + '-' + A.pint, H.pc + '-' + H.pa + '-' + H.pint],
+    ['\u2003\u2003sacked / yards lost', A.sk + ' / ' + A.sky, H.sk + ' / ' + H.sky],
+    ['Third down efficiency', A.d3.c + ' of ' + A.d3.a, H.d3.c + ' of ' + H.d3.a],
+    ['Fourth down efficiency', A.d4.c + ' of ' + A.d4.a, H.d4.c + ' of ' + H.d4.a],
+    ['Punts / average', A.punt.n + ' / ' + avg(A.punt.y, A.punt.n), H.punt.n + ' / ' + avg(H.punt.y, H.punt.n)],
+    ['\u2003\u2003inside the 20', A.punt.in20, H.punt.in20],
+    ['Field goals', A.fg.m + ' of ' + A.fg.a, H.fg.m + ' of ' + H.fg.a],
+    ['Penalties / yards', A.pen.n + ' / ' + A.pen.y, H.pen.n + ' / ' + H.pen.y],
+    ['Fumbles / lost', A.fum.n + ' / ' + A.fum.l, H.fum.n + ' / ' + H.fum.l],
+    ['Turnovers', A.to, H.to],
+    ['Red zone (TD-FG-trips)', A.rz.td + '-' + A.rz.fg + '-' + A.rz.t, H.rz.td + '-' + H.rz.fg + '-' + H.rz.t],
+    ['Time of possession', mmss(A.pos), mmss(H.pos)]
+  ];
+  tbl(b, ['', g.teams.away.abbr, g.teams.home.abbr], lines);
+
+  /* per player, per team */
+  ['away','home'].forEach(function(t){
+    b.appendChild(el('h3', 'sec', g.teams[t].name + ' — individual'));
+    var P = statRows(d, t, 'pass');
+    if(P.length) tbl(b, ['Passing','C-A','Yds','TD','Int','Sk','Rtg'],
+      P.map(function(r){ return [r.name, r.s.pc + '-' + r.s.pa, r.s.py, r.s.ptd, r.s.pint, r.s.sk, rating(r.s) || '—']; }));
+    var R = statRows(d, t, 'rush');
+    if(R.length) tbl(b, ['Rushing','Att','Yds','Avg','TD','Lg'],
+      R.map(function(r){ return [r.name, r.s.ra, r.s.ry, avg(r.s.ry, r.s.ra), r.s.rtd, r.s.rlong]; }));
+    var C = statRows(d, t, 'rec');
+    if(C.length) tbl(b, ['Receiving','Tgt','Rec','Yds','Avg','TD','Lg'],
+      C.map(function(r){ return [r.name, r.s.tgt, r.s.rec, r.s.recy, avg(r.s.recy, r.s.rec), r.s.rectd, r.s.reclong]; }));
+    var K = statRows(d, t, 'kick');
+    if(K.length) tbl(b, ['Kicking','FG','XP','Lg','Punts','Avg','I20'],
+      K.map(function(r){ return [r.name, r.s.fgm + '/' + r.s.fga, r.s.xpm + '/' + r.s.xpa, r.s.fglong || '—',
+        r.s.pn, avg(r.s.pny, r.s.pn), r.s.in20]; }));
+    var RT = statRows(d, t, 'ret');
+    if(RT.length) tbl(b, ['Returns','KR','Yds','PR','Yds','TD'],
+      RT.map(function(r){ return [r.name, r.s.kr, r.s.kry, r.s.pr, r.s.pry, r.s.krtd + r.s.prtd]; }));
+    var DF = statRows(d, t, 'def');
+    if(DF.length) tbl(b, ['Defence','Sacks','Yds','Int','Yds','FR','TD'],
+      DF.map(function(r){ return [r.name, r.s.dsack, r.s.dsacky, r.s.dint, r.s.dinty, r.s.dfr, r.s.dtd]; }));
+    if(!P.length && !R.length && !C.length && !K.length && !DF.length)
+      b.appendChild(el('div', 'note', 'Nothing recorded yet.'));
+  });
+  $('ovBox').hidden = false;
+}
+
+/* ============================= drive chart =========================== */
+function renderDrives(){
+  var g = G(), b = $('drivesBody');
+  b.textContent = '';
+  if(!D.drives.length){
+    b.appendChild(el('div', 'note', 'No drives yet.'));
+    $('ovDrives').hidden = false;
+    return;
+  }
+  D.drives.forEach(function(dr, i){
+    var scoring = dr.result === 'Touchdown' || dr.result === 'Field goal';
+    var lost = ['Interception','Fumble','Downs','Safety','Blocked punt'].indexOf(dr.result) >= 0;
+    var box = el('div', 'drv' + (scoring ? ' sc' : (lost ? ' tv' : '')));
+    var h = el('div', 'h');
+    h.appendChild(el('span', 'tm', g.teams[dr.team].abbr));
+    h.appendChild(el('span', 'rs', dr.result));
+    box.appendChild(h);
+    box.appendChild(el('div', 'dt',
+      'Q' + dr.startQtr + ' ' + (g.rules.clockMode === 'time' ? mmss(dr.startClock) + ' · ' : '') +
+      'started ' + fmtSpot(dr.startYard, dr.team) + ' — ' +
+      dr.plays + (dr.plays === 1 ? ' play' : ' plays') + ', ' + plus(dr.yards) + ' yards, ' +
+      mmss(dr.secs)));
+    b.appendChild(box);
+  });
+  $('ovDrives').hidden = false;
+}
+
+/* ============================ team & rules =========================== */
+function fld(host, label, value, onch, type, opts){
+  var f = el('div', 'field');
+  f.appendChild(el('label', null, label));
+  var i;
+  if(type === 'select'){
+    i = el('select');
+    opts.forEach(function(o){
+      var op = el('option', null, o[1]);
+      op.value = o[0];
+      if(String(o[0]) === String(value)) op.selected = true;
+      i.appendChild(op);
+    });
+  }else{
+    i = el('input');
+    i.type = type || 'text';
+    i.value = value == null ? '' : value;
+    if(type === 'number') i.inputMode = 'numeric';
+  }
+  i.addEventListener('change', function(){ onch(i.value); });
+  f.appendChild(i);
+  host.appendChild(f);
+  return i;
+}
+
+function renderSetup(){
+  var g = G(), b = $('setupBody');
+  b.textContent = '';
+
+  b.appendChild(el('h3', 'sec', 'The two clubs'));
+  var cols = el('div', 'cols');
+  ['away','home'].forEach(function(t){
+    var c = el('div');
+    c.appendChild(el('div', 'glab', t === 'away' ? 'Visitors' : 'Home'));
+    fld(c, 'Club', g.teams[t].name, function(v){ g.teams[t].name = v; saveDB(); render(); });
+    fld(c, 'Abbreviation', g.teams[t].abbr, function(v){
+      g.teams[t].abbr = v.toUpperCase().slice(0, 5); saveDB(); render(); renderSetup();
+    });
+    fld(c, 'Colour', g.teams[t].color, function(v){ g.teams[t].color = v; saveDB(); render(); }, 'color');
+    var rb = mkBtn('Roster — ' + g.teams[t].roster.length + ' players', false, function(){ openRoster(t); }, 'wide');
+    c.appendChild(rb);
+    cols.appendChild(c);
+  });
+  b.appendChild(cols);
+
+  b.appendChild(el('h3', 'sec', 'This game'));
+  var gc = el('div', 'cols');
+  var g1 = el('div');
+  fld(g1, 'Date', g.date, function(v){ g.date = v; saveDB(); }, 'date');
+  fld(g1, 'Week or label', g.label, function(v){ g.label = v; saveDB(); });
+  fld(g1, 'Venue', g.venue, function(v){ g.venue = v; saveDB(); });
+  gc.appendChild(g1);
+  var g2 = el('div');
+  fld(g2, 'Opening kickoff by', g.rules.firstKick, function(v){
+    g.rules.firstKick = v; saveDB(); render();
+  }, 'select', [['away', g.teams.away.name + ' (visitors)'], ['home', g.teams.home.name + ' (home)']]);
+  fld(g2, 'Timeouts each half', g.rules.timeouts, function(v){
+    g.rules.timeouts = clamp(num(v, 3), 0, 6); saveDB(); render();
+  }, 'number');
+  gc.appendChild(g2);
+  b.appendChild(gc);
+
+  b.appendChild(el('h3', 'sec', 'Period length'));
+  b.appendChild(el('div', 'note',
+    'APBA editions differ: some run a clock, others give each quarter a fixed number of plays. ' +
+    'Pick whichever your rulebook uses — the scoresheet keeps the same stats either way.'));
+  var rc = el('div', 'cols');
+  var r1 = el('div');
+  fld(r1, 'Quarter is measured in', g.rules.clockMode, function(v){
+    g.rules.clockMode = v; saveDB(); render(); renderSetup();
+  }, 'select', [['time', 'a running clock'], ['plays', 'a count of plays']]);
+  if(g.rules.clockMode === 'time'){
+    fld(r1, 'Minutes per quarter', g.rules.qtrMinutes, function(v){
+      g.rules.qtrMinutes = clamp(num(v, 15), 1, 30); saveDB(); render();
+    }, 'number');
+    fld(r1, 'Minutes of overtime', g.rules.otMinutes, function(v){
+      g.rules.otMinutes = clamp(num(v, 10), 1, 30); saveDB(); render();
+    }, 'number');
+  }else{
+    fld(r1, 'Plays per quarter', g.rules.playsPerQtr, function(v){
+      g.rules.playsPerQtr = clamp(num(v, 30), 1, 99); saveDB(); render();
+    }, 'number');
+  }
+  rc.appendChild(r1);
+  var r2 = el('div');
+  fld(r2, 'Kickoff from the kicking team’s own', g.rules.koFrom, function(v){
+    g.rules.koFrom = clamp(num(v, 35), 1, 50); saveDB();
+  }, 'number');
+  fld(r2, 'Touchback on a kickoff, ball on the', g.rules.tbKick, function(v){
+    g.rules.tbKick = clamp(num(v, 25), 1, 50); saveDB(); render();
+  }, 'number');
+  fld(r2, 'Touchback on a punt, ball on the', g.rules.tbPunt, function(v){
+    g.rules.tbPunt = clamp(num(v, 20), 1, 50); saveDB(); render();
+  }, 'number');
+  fld(r2, 'A missed field goal comes back to', g.rules.fgMissSpot, function(v){
+    g.rules.fgMissSpot = v; saveDB(); render();
+  }, 'select', [
+    ['kick', 'the spot of the kick (modern)'],
+    ['twenty', 'the 20-yard line'],
+    ['los', 'the previous line of scrimmage']
+  ]);
+  rc.appendChild(r2);
+  b.appendChild(rc);
+
+  if(g.rules.clockMode === 'time'){
+    b.appendChild(el('h3', 'sec', 'Seconds off the clock'));
+    b.appendChild(el('div', 'note',
+      'The default run-off for each kind of play. Any single play can be overridden in the pad.'));
+    var sc = el('div', 'cols');
+    var pairs = [['run','Run'],['passC','Pass completed'],['passI','Pass incomplete'],['sack','Sack'],
+                 ['oob','Out of bounds'],['punt','Punt'],['fg','Field goal'],['ko','Kickoff'],
+                 ['pen','Penalty'],['kneel','Kneel'],['spike','Spike']];
+    var half = Math.ceil(pairs.length / 2);
+    [pairs.slice(0, half), pairs.slice(half)].forEach(function(chunk){
+      var c = el('div');
+      chunk.forEach(function(p){
+        fld(c, p[1], g.rules.secs[p[0]], function(v){
+          g.rules.secs[p[0]] = clamp(num(v, 0), 0, 120); saveDB(); render();
+        }, 'number');
+      });
+      sc.appendChild(c);
+    });
+    b.appendChild(sc);
+  }
+
+  b.appendChild(el('h3', 'sec', 'This game’s sheet'));
+  var dz = el('div', 'row');
+  dz.appendChild(mkBtn('Clear every play', false, function(){
+    if(!G().plays.length){ toast('Already empty.'); return; }
+    if(confirm('Delete all ' + G().plays.length + ' plays in this game? The teams and rules stay.')){
+      G().plays = []; saveDB(); render(); renderSetup(); toast('Sheet cleared.');
+    }
+  }, 'sm'));
+  dz.appendChild(mkBtn('Load a sample game', false, function(){
+    if(G().plays.length && !confirm('Replace the ' + G().plays.length + ' plays already recorded?')) return;
+    loadSample(); renderSetup();
+  }, 'sm'));
+  b.appendChild(dz);
+  $('ovSetup').hidden = false;
+}
+
+/* ------------------------------ rosters ------------------------------ */
+var rosterTeam = 'away', pasteOpen = false;
+
+function openRoster(t){
+  rosterTeam = t;
+  pasteOpen = false;
+  renderRoster();
+  $('ovRoster').hidden = false;
+}
+function renderRoster(){
+  var g = G(), t = rosterTeam, b = $('rosterBody');
+  $('rosterTitle').textContent = g.teams[t].name + ' roster';
+  b.textContent = '';
+
+  if(pasteOpen){
+    b.appendChild(el('h3', 'sec', 'Paste a roster'));
+    b.appendChild(el('div', 'note',
+      'One player per line: number, position, name. Commas, tabs, vertical bars or runs of spaces all work, ' +
+      'so a column out of a spreadsheet lands the same way as something typed here. ' +
+      'Lines beginning with # are ignored.'));
+    var ta = el('textarea');
+    ta.placeholder = '12 , QB , Fran Tarkenton\n22 , RB , Chuck Foreman\n80 , WR , Sammy White\n3 , K , Fred Cox';
+    var f = el('div', 'field');
+    f.appendChild(ta);
+    b.appendChild(f);
+    var r = el('div', 'row');
+    r.appendChild(mkBtn('Replace the roster', false, function(){
+      var list = parseRoster(ta.value);
+      if(!list.length){ toast('Nothing readable in there.', 'bad'); return; }
+      g.teams[t].roster = list;
+      pasteOpen = false; saveDB(); render(); renderRoster();
+      toast(list.length + ' players in.', 'good');
+    }, 'wide'));
+    r.appendChild(mkBtn('Add to it', false, function(){
+      var list = parseRoster(ta.value);
+      if(!list.length){ toast('Nothing readable in there.', 'bad'); return; }
+      g.teams[t].roster = g.teams[t].roster.concat(list);
+      pasteOpen = false; saveDB(); render(); renderRoster();
+      toast(list.length + ' added.', 'good');
+    }, 'wide'));
+    r.appendChild(mkBtn('Cancel', false, function(){ pasteOpen = false; renderRoster(); }, 'sm'));
+    b.appendChild(r);
+    return;
+  }
+
+  b.appendChild(el('div', 'note',
+    'Number, position, name. Only the ones you actually record plays for need naming — ' +
+    'anyone left blank shows as, say, #22 RB.'));
+  var head = el('div', 'rrow');
+  head.style.opacity = '.6';
+  ['No.','Pos','Name',''].forEach(function(h, i){
+    var s = el('div', ['rn','rp','rnm','rx'][i]);
+    s.style.fontSize = '9.5px';
+    s.style.letterSpacing = '1.2px';
+    s.style.textTransform = 'uppercase';
+    s.textContent = h;
+    head.appendChild(s);
+  });
+  b.appendChild(head);
+
+  g.teams[t].roster.forEach(function(p, i){
+    var row = el('div', 'rrow');
+    var n = el('input', 'rn'); n.value = p.num; n.inputMode = 'numeric';
+    n.addEventListener('change', function(){ p.num = num(n.value, 0); saveDB(); render(); });
+    var ps = el('input', 'rp'); ps.value = p.pos;
+    ps.addEventListener('change', function(){ p.pos = ps.value.toUpperCase().slice(0, 3); saveDB(); render(); });
+    var nm = el('input', 'rnm'); nm.value = p.name; nm.placeholder = 'name';
+    nm.addEventListener('change', function(){ p.name = nm.value; saveDB(); render(); });
+    var x = el('button', 'rx', '×');
+    x.addEventListener('click', function(){
+      g.teams[t].roster.splice(i, 1); saveDB(); render(); renderRoster();
+    });
+    [n, ps, nm, x].forEach(function(e2){ row.appendChild(e2); });
+    b.appendChild(row);
+  });
+}
+function parseRoster(text){
+  var out = [];
+  text.split(/\r?\n/).forEach(function(raw){
+    var l = raw.trim();
+    if(!l || l[0] === '#') return;
+    var parts = l.split(/\s*[,|\t]\s*|\s{2,}/).filter(function(s){ return s !== ''; });
+    if(parts.length === 1) parts = l.split(/\s+/);
+    var n = 0, pos = '', name = '';
+    if(/^\d{1,2}$/.test(parts[0])){ n = num(parts[0], 0); parts.shift(); }
+    if(parts.length && /^[A-Za-z]{1,3}$/.test(parts[0])){ pos = parts.shift().toUpperCase(); }
+    name = parts.join(' ').trim();
+    if(!n && !pos && !name) return;
+    out.push({ id: uid('p'), num: n, pos: pos || '—', name: name });
+  });
+  return out;
+}
+
+/* ------------------------------- games ------------------------------- */
+function renderGames(){
+  var b = $('gamesBody');
+  b.textContent = '';
+  b.appendChild(el('div', 'note',
+    'Every game stays on this iPad until you delete it, and all of them feed the season totals.'));
+  DB.order.forEach(function(id){
+    var g = DB.games[id];
+    if(!g) return;
+    var d = derive(g);
+    var card = el('div', 'gcard');
+    if(id === DB.current) card.style.borderColor = 'var(--amber)';
+    card.appendChild(el('div', 'gs', d.st.score.away + ' – ' + d.st.score.home));
+    var m = el('div', 'gm');
+    m.appendChild(el('b', null, g.teams.away.abbr + ' at ' + g.teams.home.abbr +
+      (g.label ? '  ·  ' + g.label : '')));
+    m.appendChild(el('span', null, g.date + '  ·  ' + g.plays.length + ' plays' +
+      (d.st.phase === 'final' ? '  ·  final' : '  ·  in progress') +
+      (id === DB.current ? '  ·  on the board now' : '')));
+    card.appendChild(m);
+    if(id !== DB.current){
+      card.appendChild(mkBtn('Open', false, function(){
+        DB.current = id; saveDB(); render(); $('ovGames').hidden = true;
+      }, 'sm'));
+    }
+    card.appendChild(mkBtn('Export', false, function(){
+      download(fileName(g) + '.json', JSON.stringify(g, null, 1));
+    }, 'sm'));
+    card.appendChild(mkBtn('×', false, function(){
+      if(!confirm('Delete ' + g.teams.away.abbr + ' at ' + g.teams.home.abbr + ' for good?')) return;
+      delete DB.games[id];
+      DB.order = DB.order.filter(function(x){ return x !== id; });
+      if(DB.current === id){
+        if(!DB.order.length){ var ng = newGame(g); DB.games[ng.id] = ng; DB.order.push(ng.id); }
+        DB.current = DB.order[0];
+      }
+      saveDB(); render(); renderGames();
+    }, 'sm'));
+    b.appendChild(card);
+  });
+}
+function fileName(g){
+  return 'apba-' + (g.date || '') + '-' + (g.teams.away.abbr || 'vis') + '-at-' + (g.teams.home.abbr || 'home');
+}
+
+/* =========================== season totals =========================== */
+function seasonTotals(){
+  var teams = {}, players = {};
+  DB.order.forEach(function(id){
+    var g = DB.games[id];
+    if(!g || !g.plays.length) return;
+    var d = derive(g);
+    ['away','home'].forEach(function(t){
+      var abbr = g.teams[t].abbr || t.toUpperCase();
+      if(!teams[abbr]) teams[abbr] = { abbr: abbr, name: g.teams[t].name, gp:0, w:0, l:0, tie:0, pf:0, pa:0 };
+      var T = teams[abbr];
+      var me = d.st.score[t], them = d.st.score[other(t)];
+      T.gp++; T.pf += me; T.pa += them;
+      if(me > them) T.w++; else if(me < them) T.l++; else T.tie++;
+      for(var k in d.S.p){
+        if(k.indexOf(t + ':') !== 0) continue;
+        var pid = k.slice(t.length + 1), pl = null, r = g.teams[t].roster;
+        for(var j = 0; j < r.length; j++) if(r[j].id === pid) pl = r[j];
+        if(!pl) continue;
+        var key = abbr + '|' + pl.num + '|' + (pl.name || pl.pos);
+        if(!players[key]) players[key] = {
+          team: abbr, num: pl.num, pos: pl.pos,
+          name: pl.name || ('#' + pl.num + ' ' + pl.pos), gp: 0, s: newPlayerStat()
+        };
+        var P = players[key];
+        P.gp++;
+        var src = d.S.p[k];
+        for(var f in P.s){
+          if(f.indexOf('long') >= 0) P.s[f] = Math.max(P.s[f], src[f] || 0);
+          else P.s[f] += src[f] || 0;
+        }
+      }
+    });
+  });
+  return { teams: teams, players: players };
+}
+function renderSeason(){
+  var b = $('seasonBody');
+  b.textContent = '';
+  var S = seasonTotals();
+  var tl = Object.keys(S.teams).map(function(k){ return S.teams[k]; });
+  if(!tl.length){
+    b.appendChild(el('div', 'note', 'Nothing yet — season totals build up from every game kept on this iPad.'));
+    $('ovSeason').hidden = false;
+    return;
+  }
+  tl.sort(function(a, c){ return (c.w - c.l) - (a.w - a.l) || (c.pf - c.pa) - (a.pf - a.pa); });
+  b.appendChild(el('h3', 'sec', 'Standings'));
+  tbl(b, ['Club','G','W','L','T','PF','PA','Diff'], tl.map(function(t){
+    return [t.name + ' (' + t.abbr + ')', t.gp, t.w, t.l, t.tie, t.pf, t.pa, plus(t.pf - t.pa)];
+  }));
+
+  var pl = Object.keys(S.players).map(function(k){ return S.players[k]; });
+  function leaders(title, filter, head, row, sort){
+    var list = pl.filter(filter).sort(sort);
+    if(!list.length) return;
+    b.appendChild(el('h3', 'sec', title));
+    tbl(b, head, list.map(row));
+  }
+  leaders('Passing', function(p){ return p.s.pa > 0; },
+    ['Player','Tm','G','C-A','Yds','TD','Int','Sk','Rtg'],
+    function(p){ return [p.name, p.team, p.gp, p.s.pc + '-' + p.s.pa, p.s.py, p.s.ptd, p.s.pint, p.s.sk, rating(p.s) || '—']; },
+    function(a, c){ return c.s.py - a.s.py; });
+  leaders('Rushing', function(p){ return p.s.ra > 0; },
+    ['Player','Tm','G','Att','Yds','Avg','TD','Lg'],
+    function(p){ return [p.name, p.team, p.gp, p.s.ra, p.s.ry, avg(p.s.ry, p.s.ra), p.s.rtd, p.s.rlong]; },
+    function(a, c){ return c.s.ry - a.s.ry; });
+  leaders('Receiving', function(p){ return p.s.rec > 0; },
+    ['Player','Tm','G','Rec','Yds','Avg','TD','Lg'],
+    function(p){ return [p.name, p.team, p.gp, p.s.rec, p.s.recy, avg(p.s.recy, p.s.rec), p.s.rectd, p.s.reclong]; },
+    function(a, c){ return c.s.recy - a.s.recy; });
+  leaders('Kicking', function(p){ return (p.s.fga + p.s.xpa) > 0; },
+    ['Player','Tm','G','FG','XP','Lg','Pts'],
+    function(p){ return [p.name, p.team, p.gp, p.s.fgm + '/' + p.s.fga, p.s.xpm + '/' + p.s.xpa,
+      p.s.fglong || '—', p.s.fgm * 3 + p.s.xpm]; },
+    function(a, c){ return (c.s.fgm * 3 + c.s.xpm) - (a.s.fgm * 3 + a.s.xpm); });
+  leaders('Punting', function(p){ return p.s.pn > 0; },
+    ['Player','Tm','G','No','Yds','Avg','Lg','I20'],
+    function(p){ return [p.name, p.team, p.gp, p.s.pn, p.s.pny, avg(p.s.pny, p.s.pn), p.s.pnlong, p.s.in20]; },
+    function(a, c){ return c.s.pn - a.s.pn; });
+  leaders('Defence', function(p){ return (p.s.dint + p.s.dsack + p.s.dfr) > 0; },
+    ['Player','Tm','G','Sacks','Int','Yds','TD','FR'],
+    function(p){ return [p.name, p.team, p.gp, p.s.dsack, p.s.dint, p.s.dinty, p.s.dtd, p.s.dfr]; },
+    function(a, c){ return (c.s.dsack + c.s.dint) - (a.s.dsack + a.s.dint); });
+  $('ovSeason').hidden = false;
+}
+
+/* ============================== exports ============================== */
+function download(name, text, mime){
+  try{
+    var blob = new Blob([text], { type: mime || 'application/json' });
+    var url = URL.createObjectURL(blob);
+    var a = el('a');
+    a.href = url; a.download = name;
+    document.body.appendChild(a);
+    a.click();
+    setTimeout(function(){ URL.revokeObjectURL(url); a.remove(); }, 500);
+    toast('Saved ' + name, 'good');
+  }catch(e){ toast('Could not save that file.', 'bad'); }
+}
+function copyOut(text){
+  function done(){ toast('Copied — paste it wherever you like.', 'good'); }
+  if(navigator.clipboard && navigator.clipboard.writeText){
+    navigator.clipboard.writeText(text).then(done, fallback);
+  }else fallback();
+  function fallback(){
+    var ta = el('textarea');
+    ta.value = text;
+    ta.style.position = 'fixed';
+    ta.style.opacity = '0';
+    document.body.appendChild(ta);
+    ta.select();
+    try{ document.execCommand('copy'); done(); }
+    catch(e){ toast('Select the text and copy it by hand.', 'bad'); }
+    ta.remove();
+  }
+}
+function boxText(){
+  var g = G(), d = D, L = [];
+  var A = g.teams.away.abbr, H = g.teams.home.abbr;
+  L.push(g.teams.away.name + ' at ' + g.teams.home.name);
+  L.push([g.date, g.label, g.venue].filter(Boolean).join('  ·  '));
+  L.push('');
+  var qs = d.st.line.away.length;
+  var hdr = ['     ']; for(var i = 0; i < qs; i++) hdr.push(i >= 4 ? 'OT' : String(i + 1));
+  hdr.push('  T');
+  L.push(hdr.join('  '));
+  ['away','home'].forEach(function(t){
+    var r = [(g.teams[t].abbr + '    ').slice(0, 5)];
+    d.st.line[t].forEach(function(v){ r.push(String(v)); });
+    r.push(' ' + d.st.score[t]);
+    L.push(r.join('  '));
+  });
+  L.push('');
+  L.push('SCORING');
+  d.rows.forEach(function(r){
+    if(!r.ev.score) return;
+    L.push('  Q' + r.pre.qtr + ' ' + (g.rules.clockMode === 'time' ? mmss(r.pre.clock) + ' ' : '') +
+      g.teams[r.ev.score.team].abbr + ' — ' + describe(r) +
+      ' (' + A + ' ' + r.post.score.away + ', ' + H + ' ' + r.post.score.home + ')');
+  });
+  L.push('');
+  L.push('TEAM' + '                        ' + A + '   ' + H);
+  var T = d.S.t;
+  function line(label, a, h){
+    L.push('  ' + (label + '                          ').slice(0, 26) + String(a) + '   ' + String(h));
+  }
+  line('First downs', T.away.fd.t, T.home.fd.t);
+  line('Total net yards', T.away.net, T.home.net);
+  line('Rushing (att-yds)', T.away.ra + '-' + T.away.ry, T.home.ra + '-' + T.home.ry);
+  line('Passing (c-a-i)', T.away.pc + '-' + T.away.pa + '-' + T.away.pint,
+                          T.home.pc + '-' + T.home.pa + '-' + T.home.pint);
+  line('Passing yards', T.away.py, T.home.py);
+  line('Sacked (n-yds)', T.away.sk + '-' + T.away.sky, T.home.sk + '-' + T.home.sky);
+  line('Punts (n-avg)', T.away.punt.n + '-' + avg(T.away.punt.y, T.away.punt.n),
+                        T.home.punt.n + '-' + avg(T.home.punt.y, T.home.punt.n));
+  line('Penalties (n-yds)', T.away.pen.n + '-' + T.away.pen.y, T.home.pen.n + '-' + T.home.pen.y);
+  line('Turnovers', T.away.to, T.home.to);
+  line('Time of possession', mmss(T.away.pos), mmss(T.home.pos));
+  L.push('');
+  ['away','home'].forEach(function(t){
+    L.push(g.teams[t].name.toUpperCase());
+    [['pass','Passing', function(s){ return s.pc + '-' + s.pa + ', ' + s.py + ' yds, ' + s.ptd + ' TD, ' + s.pint + ' int'; }],
+     ['rush','Rushing', function(s){ return s.ra + ' att, ' + s.ry + ' yds, ' + s.rtd + ' TD'; }],
+     ['rec','Receiving', function(s){ return s.rec + ' rec, ' + s.recy + ' yds, ' + s.rectd + ' TD'; }],
+     ['kick','Kicking', function(s){ return 'FG ' + s.fgm + '/' + s.fga + ', XP ' + s.xpm + '/' + s.xpa +
+        (s.pn ? ', ' + s.pn + ' punts ' + avg(s.pny, s.pn) : ''); }],
+     ['def','Defence', function(s){ return s.dsack + ' sacks, ' + s.dint + ' int, ' + s.dfr + ' fum rec'; }]
+    ].forEach(function(k){
+      var rows = statRows(d, t, k[0]);
+      if(!rows.length) return;
+      L.push('  ' + k[1]);
+      rows.forEach(function(r){ L.push('    ' + r.name + ' — ' + k[2](r.s)); });
+    });
+    L.push('');
+  });
+  L.push('PLAY BY PLAY');
+  d.rows.forEach(function(r){ L.push('  ' + situation(r.pre, g) + '  ' + describe(r)); });
+  return L.join('\n');
+}
+function seasonText(){
+  var S = seasonTotals(), L = ['SEASON TOTALS', ''];
+  var tl = Object.keys(S.teams).map(function(k){ return S.teams[k]; })
+    .sort(function(a, c){ return (c.w - c.l) - (a.w - a.l); });
+  L.push('STANDINGS');
+  tl.forEach(function(t){
+    L.push('  ' + (t.name + '                    ').slice(0, 20) + t.w + '-' + t.l + '-' + t.tie +
+      '   PF ' + t.pf + '  PA ' + t.pa);
+  });
+  var pl = Object.keys(S.players).map(function(k){ return S.players[k]; });
+  function sect(title, filter, fmt, sort){
+    var list = pl.filter(filter).sort(sort);
+    if(!list.length) return;
+    L.push(''); L.push(title.toUpperCase());
+    list.forEach(function(p){ L.push('  ' + p.name + ' (' + p.team + ') — ' + fmt(p)); });
+  }
+  sect('Passing', function(p){ return p.s.pa > 0; },
+    function(p){ return p.s.pc + '-' + p.s.pa + ', ' + p.s.py + ' yds, ' + p.s.ptd + ' TD, ' + p.s.pint + ' int, rtg ' + (rating(p.s) || '—'); },
+    function(a, c){ return c.s.py - a.s.py; });
+  sect('Rushing', function(p){ return p.s.ra > 0; },
+    function(p){ return p.s.ra + ' att, ' + p.s.ry + ' yds, ' + avg(p.s.ry, p.s.ra) + ' avg, ' + p.s.rtd + ' TD'; },
+    function(a, c){ return c.s.ry - a.s.ry; });
+  sect('Receiving', function(p){ return p.s.rec > 0; },
+    function(p){ return p.s.rec + ' rec, ' + p.s.recy + ' yds, ' + p.s.rectd + ' TD'; },
+    function(a, c){ return c.s.recy - a.s.recy; });
+  sect('Defence', function(p){ return (p.s.dint + p.s.dsack) > 0; },
+    function(p){ return p.s.dsack + ' sacks, ' + p.s.dint + ' int'; },
+    function(a, c){ return (c.s.dsack + c.s.dint) - (a.s.dsack + a.s.dint); });
+  return L.join('\n');
+}
+
+/* =============================== menu ================================ */
+function renderMenu(){
+  var b = $('menuBody'), g = G();
+  b.textContent = '';
+  var items = [
+    ['Teams, rosters and rules', function(){ $('ovMenu').hidden = true; renderSetup(); }],
+    ['Box score', function(){ $('ovMenu').hidden = true; renderBox(); }],
+    ['Drive chart', function(){ $('ovMenu').hidden = true; renderDrives(); }],
+    ['Season totals', function(){ $('ovMenu').hidden = true; renderSeason(); }],
+    ['Games on this iPad', function(){ $('ovMenu').hidden = true; renderGames(); $('ovGames').hidden = false; }]
+  ];
+  var grid = el('div', 'row');
+  items.forEach(function(it){
+    var btn = mkBtn(it[0], false, it[1], 'wide');
+    btn.style.flex = '1 1 240px';
+    grid.appendChild(btn);
+  });
+  b.appendChild(grid);
+
+  b.appendChild(el('h3', 'sec', 'This game'));
+  var r2 = el('div', 'row');
+  r2.appendChild(mkBtn('Copy the box score as text', false, function(){ copyOut(boxText()); }, 'sm'));
+  r2.appendChild(mkBtn('Export the game file', false, function(){
+    download(fileName(g) + '.json', JSON.stringify(g, null, 1));
+  }, 'sm'));
+  r2.appendChild(mkBtn('Import a game file', false, function(){ $('fileIn').click(); }, 'sm'));
+  r2.appendChild(mkBtn('Start the next game', false, function(){
+    var ng = newGame(g);
+    DB.games[ng.id] = ng; DB.order.unshift(ng.id); DB.current = ng.id;
+    saveDB(); render(); $('ovMenu').hidden = true;
+    toast('New game — same two clubs.', 'good');
+  }, 'sm'));
+  if(document.documentElement.requestFullscreen){
+    r2.appendChild(mkBtn('Full screen', false, function(){
+      if(document.fullscreenElement) document.exitFullscreen();
+      else document.documentElement.requestFullscreen();
+    }, 'sm'));
+  }
+  b.appendChild(r2);
+
+  b.appendChild(el('h3', 'sec', 'How it keeps the game'));
+  var note = el('div', 'note');
+  note.innerHTML =
+    'The play list is the only thing stored. Score, downs, field position, drives and every stat are worked ' +
+    'out from it afresh each time, so <b>Undo</b> and correcting a play can never leave the scoreboard ' +
+    'disagreeing with the box score.<br><br>' +
+    'Tap any line in the play-by-play to correct or delete it. ' +
+    'The dice and <b>PRN</b> boxes at the foot of the pad are optional — fill them in if your league ' +
+    'wants an audit trail of the roll and result number behind each play, and they are carried in the export.<br><br>' +
+    'Everything lives in this browser on this iPad. Export a game file after each session if it matters to you.';
+  b.appendChild(note);
+  b.appendChild(el('div', 'note', 'Version ' + VERSION + '.'));
+  $('ovMenu').hidden = false;
+}
+
+/* ============================ sample game ============================ */
+function loadSample(){
+  var g = G();
+  var A = g.teams.away, H = g.teams.home;
+  var pick = function(t, pos, n){
+    var r = roster(t).filter(function(p){ return p.pos === pos; });
+    return r.length ? r[Math.min(n || 0, r.length - 1)].id : null;
+  };
+  var P = {
+    hQB: pick('home','QB'), hRB: pick('home','RB'), hRB2: pick('home','RB',1),
+    hWR: pick('home','WR'), hWR2: pick('home','WR',1), hTE: pick('home','TE'),
+    hK: pick('home','K'), hP: pick('home','P'),
+    aQB: pick('away','QB'), aRB: pick('away','RB'), aWR: pick('away','WR'),
+    aK: pick('away','K'), aP: pick('away','P'),
+    aCB: pick('away','CB'), aLB: pick('away','LB'), hLB: pick('home','LB'), hDE: pick('home','DE')
+  };
+  var p = [];
+  function add(o){ o.id = uid('pl'); p.push(o); }
+  add({ t:'ko', kicker:P.hK, catchAt:3, toYard:28, returner:P.aWR, dW:4, dR:2 });
+  add({ t:'run', rusher:P.aRB, yards:6, prn:'12' });
+  add({ t:'pass', passer:P.aQB, receiver:P.aWR, complete:true, yards:9, prn:'7' });
+  add({ t:'run', rusher:P.aRB, yards:3 });
+  add({ t:'pass', passer:P.aQB, receiver:P.aWR, complete:false, prn:'31' });
+  add({ t:'sack', passer:P.aQB, defender:P.hDE, yards:-8, prn:'27' });
+  add({ t:'punt', punter:P.aP, gross:44, returner:P.hWR, retYards:7 });
+  add({ t:'run', rusher:P.hRB, yards:12 });
+  add({ t:'pen', on:'o', yards:10, name:'holding', player:P.hTE });
+  add({ t:'pass', passer:P.hQB, receiver:P.hTE, complete:true, yards:14 });
+  add({ t:'run', rusher:P.hRB2, yards:4 });
+  add({ t:'pass', passer:P.hQB, receiver:P.hWR2, complete:true, yards:31 });
+  add({ t:'run', rusher:P.hRB, yards:5 });
+  add({ t:'pass', passer:P.hQB, receiver:P.hWR, complete:true, yards:19 });
+  add({ t:'xp', kicker:P.hK, good:true });
+  add({ t:'ko', kicker:P.hK, touchback:true });
+  add({ t:'pass', passer:P.aQB, receiver:P.aWR, complete:true, yards:11 });
+  add({ t:'run', rusher:P.aRB, yards:-2 });
+  add({ t:'pass', passer:P.aQB, complete:false, result:'int', defender:P.hLB, yards:14, retYards:22, prn:'44' });
+  add({ t:'run', rusher:P.hRB, yards:7 });
+  add({ t:'fg', kicker:P.hK, good:true });
+  add({ t:'ko', kicker:P.hK, catchAt:2, toYard:24, returner:P.aWR });
+  add({ t:'run', rusher:P.aRB, yards:8 });
+  add({ t:'pass', passer:P.aQB, receiver:P.aWR, complete:true, yards:26 });
+  add({ t:'pen', on:'d', yards:15, auto1st:true, name:'pass interference', player:P.hLB });
+  add({ t:'run', rusher:P.aRB, yards:9 });
+  add({ t:'pass', passer:P.aQB, receiver:P.aWR, complete:true, yards:18 });
+  add({ t:'xp', kicker:P.aK, good:true });
+  g.plays = p;
+  saveDB(); render();
+  toast('Sample game loaded — look at the box score.', 'good');
+}
+
+/* ================================ boot =============================== */
+function importGame(text){
+  var o;
+  try{ o = JSON.parse(text); }
+  catch(e){ toast('That is not a game file.', 'bad'); return; }
+  if(!o || !o.teams || !Array.isArray(o.plays)){ toast('That file has no game in it.', 'bad'); return; }
+  o.id = o.id && !DB.games[o.id] ? o.id : uid('g');
+  DB.games[o.id] = o;
+  DB.order.unshift(o.id);
+  DB.current = o.id;
+  saveDB(); render();
+  $('ovGames').hidden = true;
+  toast('Imported ' + o.teams.away.abbr + ' at ' + o.teams.home.abbr + '.', 'good');
+}
+
+function wire(){
+  $('commit').addEventListener('click', commitPad);
+  $('btnUndo').addEventListener('click', undo);
+  $('btnBox').addEventListener('click', renderBox);
+  $('btnMore').addEventListener('click', renderMenu);
+  $('btnDrives').addEventListener('click', renderDrives);
+  $('btnJumpEnd').addEventListener('click', function(){
+    var l = $('log'); l.scrollTop = l.scrollHeight;
+  });
+  $('sideAway').addEventListener('click', function(){ openRoster('away'); });
+  $('sideHome').addEventListener('click', function(){ openRoster('home'); });
+
+  [['boxClose','ovBox'],['drivesClose','ovDrives'],['menuClose','ovMenu'],
+   ['rosterClose','ovRoster'],['setupClose','ovSetup'],['gamesClose','ovGames'],
+   ['seasonClose','ovSeason'],['editClose','ovEdit']].forEach(function(p){
+    $(p[0]).addEventListener('click', function(){ $(p[1]).hidden = true; render(); });
+  });
+  $('boxText').addEventListener('click', function(){ copyOut(boxText()); });
+  $('boxJSON').addEventListener('click', function(){
+    download(fileName(G()) + '.json', JSON.stringify(G(), null, 1));
+  });
+  $('seasonText').addEventListener('click', function(){ copyOut(seasonText()); });
+  $('rosterAdd').addEventListener('click', function(){
+    G().teams[rosterTeam].roster.push({ id: uid('p'), num: 0, pos: '—', name: '' });
+    saveDB(); renderRoster();
+  });
+  $('rosterPaste').addEventListener('click', function(){ pasteOpen = !pasteOpen; renderRoster(); });
+  $('gamesNew').addEventListener('click', function(){
+    var ng = newGame(G());
+    DB.games[ng.id] = ng; DB.order.unshift(ng.id); DB.current = ng.id;
+    saveDB(); render(); renderGames();
+  });
+  $('gamesImport').addEventListener('click', function(){ $('fileIn').click(); });
+  $('fileIn').addEventListener('change', function(e){
+    var f = e.target.files[0];
+    if(!f) return;
+    var rd = new FileReader();
+    rd.onload = function(){ importGame(String(rd.result)); };
+    rd.readAsText(f);
+    e.target.value = '';
+  });
+
+  /* the dice, read the APBA way: white die first, red second */
+  function cycle(key, node){
+    pad[key] = (num(pad[key], 0) % 6) + 1;
+    node.textContent = pad[key];
+  }
+  $('dieW').addEventListener('click', function(){ cycle('dW', $('dieW')); });
+  $('dieR').addEventListener('click', function(){ cycle('dR', $('dieR')); });
+  $('btnRoll').addEventListener('click', function(){
+    pad.dW = 1 + Math.floor(Math.random() * 6);
+    pad.dR = 1 + Math.floor(Math.random() * 6);
+    $('dieW').textContent = pad.dW;
+    $('dieR').textContent = pad.dR;
+    toast('Rolled ' + pad.dW + '-' + pad.dR + '  (' + pad.dW + '' + pad.dR + ')');
+  });
+  $('inPRN').addEventListener('input', function(){ pad.prn = $('inPRN').value; });
+  $('inDef').addEventListener('input', function(){ pad.defCall = $('inDef').value; });
+
+  document.addEventListener('keydown', function(e){
+    if(/^(INPUT|TEXTAREA|SELECT)$/.test(e.target.tagName)) return;
+    if(e.key === 'Escape'){
+      ['ovBox','ovDrives','ovMenu','ovRoster','ovSetup','ovGames','ovSeason','ovEdit']
+        .forEach(function(id){ $(id).hidden = true; });
+      render();
+    }
+    if(e.key === 'Enter'){ e.preventDefault(); commitPad(); }
+    if(e.key === 'u') undo();
+    if(e.key === 'b') renderBox();
+    if(e.key === 'r'){ $('btnRoll').click(); }
+  });
+
+  window.addEventListener('beforeunload', saveDB);
+}
+
+loadDB();
+wire();
+render();
+
+if('serviceWorker' in navigator){
+  window.addEventListener('load', function(){
+    navigator.serviceWorker.register('sw.js').catch(function(){ /* file:// or no SW — the app still runs */ });
+  });
+}
+</script>
+
+</body>
+</html>
