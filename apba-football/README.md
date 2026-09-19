@@ -181,6 +181,71 @@ opens the whole roster when the halfback throws.
 
 ---
 
+## The club library
+
+A game holds two clubs. A league holds a lot more, and nobody wants to type a
+roster twice, so **Menu → Club library** keeps them.
+
+**Save to library** — on the roster screen or beside either club in setup —
+puts that club away under its abbreviation. From then on it appears in **Load a
+club from the library** on both sides of the setup screen, and under
+**Visitors** and **Home** in the library itself. Loading one replaces that side
+of the current game: name, colour and the whole roster.
+
+A club in the library is a copy. Edit it there and games already played keep
+the roster they were played with, which is what you want — a box score should
+not change because somebody got traded in March.
+
+### The 2020 season, already in
+
+**Load the 2020 NFL clubs** in the club library puts all 32 clubs in at once —
+1,986 players with their real shirt numbers and positions, ready to play.
+
+Two things to know about it:
+
+- These are the **real 2020 NFL rosters, not an APBA card set.** The names,
+  numbers and positions are right; which players APBA printed cards for that
+  season is a separate question, so expect men in the app with no card, and
+  check your own set for anyone missing.
+- It is everyone who was **active or on reserve** during the season, so around
+  sixty per club. Practice-squad-only and released players are left out.
+
+Both are easily fixed by hand: open the club's roster and delete whoever you do
+not want. It is your library.
+
+The player chips in the pad cope with rosters this size by showing the ones who
+usually do the job first — receivers before backs on a pass, linemen before
+backs on a sack — and hiding the tail behind **+ n more**.
+
+Roster data from [nflverse](https://github.com/nflverse/nflverse-data),
+used under [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/).
+
+### Putting a whole league in at once
+
+**Paste clubs** takes any number of clubs in one go. A line beginning **TEAM**
+starts a new one; every line after it is a player, read exactly as a single
+roster is read:
+
+    TEAM , Seattle Seahawks , SEA , #0c2340
+    3  , QB , Russell Wilson
+    32 , RB , Chris Carson
+    14 , WR , DK Metcalf
+
+    TEAM , Buffalo Bills , BUF , #00338d
+    17 , QB , Josh Allen
+    14 , WR , Stefon Diggs
+
+The abbreviation and the colour are both optional — leave the colour out and
+one is picked for you. A club whose abbreviation is already in the library
+replaces it, so you can paste a corrected list over the top without ending up
+with two of everything. Lines starting with `#` are ignored, so you can keep
+notes in the same text.
+
+**Export** and **Import** move the whole library between devices as one file —
+the way to get a league onto a second iPad without typing it again.
+
+---
+
 ## What it keeps
 
 **Box score** (also the `b` key) gives you the lot:
@@ -218,6 +283,9 @@ storage: clearing Safari's site data takes the season with it.
 **Games on this iPad** lists everything kept, opens any of them, and starts the
 next game with the same two clubs and the same house rules already set.
 
+**Export** in the club library writes every club to one file, separately from
+the games — that is the one to keep if the rosters cost you an evening.
+
 ---
 
 ## Keyboard (for setting a league up on a laptop)
@@ -245,6 +313,7 @@ totals**, the way the league books have always done it.
 ## Files
 
     index.html            the entire app
+    clubs/nfl-2020.json   the 2020 rosters, loadable from the club library
     sw.js                 offline cache — bump CACHE to ship an update
     manifest.webmanifest  home-screen install
     icon.svg
