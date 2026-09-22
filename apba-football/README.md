@@ -80,6 +80,18 @@ than a gain — where a kickoff was caught and returned to, where an onside kick
 or a blocked punt was recovered — and those ask for the yard line in the plain
 way a broadcaster would say it: *their own 24*.
 
+### Kickoffs and punts: say what happened
+
+Both ask **What happened** and give you the outcomes as buttons —
+**Returned**, **Touchback**, **Onside** on a kickoff; **Returned**, **Fair
+catch**, **Downed**, **Touchback**, **Blocked** on a punt. Pick **Returned**
+and the returner and the return yardage appear.
+
+Both default to a return, because that is what usually happens.
+
+An **interception return** lives on the pass: choose **Intercepted** as the
+result and you get who picked it off, how far past the line, and the return.
+
 ### Fumbles, interceptions and returns
 
 Toggle **Fumble LOST** or **Intercepted** and the fields you need appear: who
@@ -117,6 +129,50 @@ card it came off. Leave the boxes empty and nothing is lost.
 The app deliberately does **not** look anything up. It has no cards, no result
 charts and no opinion about what should have happened — the board decides that,
 and this records it.
+
+---
+
+## Setting the board by hand
+
+**Set up**, at the end of the second row of play buttons, puts the board
+wherever you like: which club has it, where on the field, the down, the
+distance, the quarter, the clock and both scores.
+
+Two things it is for:
+
+- **Starting somewhere other than the opening kickoff.** Play the second half
+  of a 1978 game on a wet Tuesday: set the score, the quarter and the kickoff,
+  and go.
+- **Straightening things out.** Something happened that the sheet has no play
+  for, or a play got missed three downs ago and you only noticed now. Put the
+  board right and carry on.
+
+It is recorded as a line in the play-by-play like everything else, so **Undo**
+takes it back, and the sheet still shows what you did rather than hiding it.
+Give it a reason in the **Why** box and the play-by-play will say so.
+
+It does not take time off the clock — it sets the clock.
+
+---
+
+## Printing it, and PDFs
+
+**Box score → Print / PDF** lays the whole thing out as a document: a masthead
+with the result, the line score, scoring summary, team statistics, every
+player, and the full play-by-play, black on white with sensible page breaks.
+The screen furniture — buttons, panels, the dark ground — is left out.
+
+On the iPad that is also how you get a PDF:
+
+1. **Box score → Print / PDF.**
+2. In the print preview, **pinch outwards** on the page thumbnail. It opens as
+   a PDF.
+3. **Share → Save to Files**, or mail it straight to the league.
+
+If the button does nothing in the home-screen app — iPadOS is inconsistent
+about printing from an installed app — open the same address in Safari
+instead and use **Share → Print** there. Everything else about the app works
+the same in a plain Safari tab.
 
 ---
 
