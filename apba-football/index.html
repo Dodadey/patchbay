@@ -335,6 +335,59 @@ tr.tot td{font-weight:700; color:var(--amber); border-bottom:1px solid var(--lin
   .side{flex:1 1 40%;}
 }
 @media (prefers-reduced-motion:reduce){ *{transition:none !important; animation:none !important;} }
+
+/* ------------------------- the printed sheet -------------------------
+   Safari prints to PDF, so the box score is laid out as a document: black
+   on white, hairline rules, and nothing broken across a page that should
+   not be. What is on screen is a panel; what comes out is a record. */
+.printhead, .printonly{display:none;}
+@media print{
+  :root{padding:0 !important;}
+  html,body{height:auto !important; overflow:visible !important;
+            background:#fff !important; color:#000 !important;}
+  #app, #toast{display:none !important;}
+  .ov{display:none !important;}
+  .ov#ovBox:not([hidden]){
+    display:block !important; position:static !important; inset:auto !important;
+    height:auto !important; padding:0 !important;
+    background:#fff !important; color:#000 !important;
+  }
+  #ovBox .ovHead{display:none !important;}
+  #ovBox .ovBody{overflow:visible !important; max-width:none !important; padding:0 !important;}
+  .printhead{display:block !important; margin-bottom:16pt;}
+  .printonly{display:block !important;}
+  .printhead .match{
+    font-family:var(--board); font-size:21pt; line-height:1.1; letter-spacing:.2pt;
+    color:#000; margin-bottom:3pt;
+  }
+  .printhead .sub{font-size:8.5pt; color:#444; letter-spacing:.3pt;}
+  .printhead .rule{border-bottom:2px solid #000; margin-top:7pt;}
+  h3.sec{
+    color:#000 !important; border-bottom:1px solid #000 !important;
+    font-size:8.5pt !important; margin:15pt 0 5pt !important; break-after:avoid;
+  }
+  table{font-size:9pt !important;}
+  th{color:#000 !important; border-bottom:1px solid #000 !important; font-size:7pt !important;}
+  td{color:#000 !important; border-bottom:1px solid #d6d6d6 !important; padding:3pt 5pt !important;}
+  tr.tot td{color:#000 !important; font-weight:700; border-bottom:1.5px solid #000 !important;}
+  .linescore td:last-child{color:#000 !important;}
+  .linescore td:first-child,.linescore th:first-child{font-size:12pt !important;}
+  .tw{overflow:visible !important;}
+  .drv{border-left:2px solid #000 !important; page-break-inside:avoid;}
+  .drv .rs, .drv .tm{color:#000 !important;}
+  .drv .dt{color:#333 !important;}
+  .note{color:#333 !important; font-size:8.5pt !important;}
+  tr, .gcard{page-break-inside:avoid;}
+  .pbp{font-size:8.5pt; line-height:1.5;}
+  .pbp .r{display:flex; gap:8pt; border-bottom:1px solid #eee; padding:2pt 0; page-break-inside:avoid;}
+  .pbp .s{flex:0 0 116pt; color:#555; font-variant-numeric:tabular-nums;}
+  .pbp .t{flex:1 1 auto;}
+  .printfoot{
+    display:block !important; margin-top:14pt; padding-top:6pt;
+    border-top:1px solid #000; font-size:7.5pt; color:#555;
+  }
+  @page{margin:14mm 12mm;}
+}
 </style>
 </head>
 <body>
@@ -434,7 +487,8 @@ tr.tot td{font-weight:700; color:var(--amber); border-bottom:1px solid var(--lin
 <div class="ov" id="ovBox" hidden>
   <div class="ovHead">
     <h2>Box score</h2>
-    <button class="mbtn sp" id="boxText">Copy as text</button>
+    <button class="mbtn sp" id="boxPrint">Print / PDF</button>
+    <button class="mbtn" id="boxText">Copy as text</button>
     <button class="mbtn" id="boxJSON">Export game</button>
     <button class="mbtn" id="boxClose">Close</button>
   </div>
@@ -1125,6 +1179,46 @@ function applyPlay(st, p, g, S){
     break;
   }
 
+  /* --------------------- set the situation by hand -------------------- */
+  case 'set': {
+    if(p.qtr != null){
+      var q = clamp(num(p.qtr, st.qtr), 1, 8);
+      while(st.line.away.length < q){ st.line.away.push(0); st.line.home.push(0); }
+      st.qtr = q;
+      st.half = q >= 3 ? 2 : 1;
+    }
+    /* the score is set as a total; the difference lands in this quarter */
+    ['away','home'].forEach(function(t){
+      var want = t === 'away' ? p.scoreAway : p.scoreHome;
+      if(want == null || want === '') return;
+      var delta = num(want, st.score[t]) - st.score[t];
+      if(delta) addScore(st, t, delta);
+    });
+    var clockv = p.clock;
+    if(clockv == null && (p.clockM != null || p.clockS != null))
+      clockv = num(p.clockM, 0) * 60 + num(p.clockS, 0);
+    if(clockv != null && clockv !== '') st.clock = Math.max(0, num(clockv, st.clock));
+    if(p.toAway != null && p.toAway !== '') st.to.away = clamp(num(p.toAway, 3), 0, 9);
+    if(p.toHome != null && p.toHome !== '') st.to.home = clamp(num(p.toHome, 3), 0, 9);
+    st.over = false;
+    if(p.kickoff){
+      toKickoff(st, p.poss || st.kickTeam, false);
+    }else if(p.poss){
+      var yard = p.yard;
+      if(yard == null && p.spotN != null)
+        yard = p.half === 'opp' ? 100 - num(p.spotN, 25) : num(p.spotN, 25);
+      st.poss = p.poss;
+      st.phase = 'scrimmage';
+      st.freeKick = false;
+      st.yard = clamp(num(yard == null ? 25 : yard, 25), 1, 99);
+      st.down = clamp(num(p.down, 1), 1, 4);
+      st.toGo = clamp(num(p.toGo, 10), 1, 99);
+    }
+    st.expired = g.rules.clockMode === 'time' ? st.clock <= 0 : st.playsLeft <= 0;
+    ev.end = 'set';
+    return ev;
+  }
+
   /* ---------------------------- bookkeeping --------------------------- */
   case 'to': {
     if(p.team && st.to[p.team] > 0) st.to[p.team]--;
@@ -1228,6 +1322,7 @@ function derive(g){
       else if(ev.end === 'safety') closeDrive('Safety', post);
       else if(ev.end === 'blocked') closeDrive('Blocked punt', post);
     }
+    if(p.t === 'set') closeDrive('Situation set', post);
     if(p.t === 'endq' || p.t === 'final') closeDrive(p.t === 'final' ? 'End of game' : 'End of period', post);
   }
   closeDrive('In progress', st);
@@ -1259,6 +1354,8 @@ function describe(row){
   if(ev.end === 'skipped')
     return 'Out of sequence (' + p.t + ') — an earlier play was changed. Tap to correct or delete it.';
   var N = function(t, id){ return pShort(t, id); };
+  /* an unnamed man is left out of the sentence rather than written as a dash */
+  var by = function(t, id){ return id && player(t, id) ? ' by ' + pShort(t, id) : ''; };
   var yds = function(y){ return Math.abs(y) + (Math.abs(y) === 1 ? ' yard' : ' yards'); };
   var s;
 
@@ -1307,7 +1404,7 @@ function describe(row){
     return s + '.';
   }
   case 'sack': {
-    s = N(off, p.passer) + ' sacked by ' + N(other(off), p.defender) + ' for ' + yds(num(p.yards, 0)) + ' lost';
+    s = N(off, p.passer) + ' sacked' + by(other(off), p.defender) + ' for ' + yds(num(p.yards, 0)) + ' lost';
     if(ev.end === 'safety') return s + ' — SAFETY.';
     if(p.result === 'fumlost') return s + ', FUMBLES, recovered by ' + g.teams[other(off)].abbr + '.';
     return s + '.';
@@ -1315,7 +1412,7 @@ function describe(row){
   case 'pass': {
     var py = num(p.yards, 0);
     if(p.result === 'int'){
-      s = N(off, p.passer) + ' pass INTERCEPTED by ' + N(other(off), p.defender);
+      s = N(off, p.passer) + ' pass INTERCEPTED' + by(other(off), p.defender);
       var iy = num(p.retYards, 0);
       if(iy) s += ', returned ' + yds(iy);
       if(ev.score && ev.score.kind === 'INT TD') s += ' for a TOUCHDOWN';
@@ -1335,6 +1432,21 @@ function describe(row){
     if(p.auto1st) s += ' (automatic first down)';
     if(p.lossDown) s += ' (loss of down)';
     return s + '.';
+  }
+  case 'set': {
+    var bits = [];
+    if(p.kickoff) bits.push('kickoff by ' + g.teams[p.poss || pre.kickTeam].abbr);
+    else if(p.poss){
+      var y = p.yard;
+      if(y == null && p.spotN != null) y = p.half === 'opp' ? 100 - num(p.spotN, 25) : num(p.spotN, 25);
+      bits.push(g.teams[p.poss].abbr + ' ball, ' + ord(num(p.down, 1)) + ' & ' + num(p.toGo, 10) +
+        ' at ' + fmtSpot(clamp(num(y, 25), 1, 99), p.poss));
+    }
+    if(p.qtr != null) bits.push('Q' + p.qtr);
+    if(p.scoreAway != null || p.scoreHome != null)
+      bits.push(g.teams.away.abbr + ' ' + num(p.scoreAway, pre.score.away) +
+                ', ' + g.teams.home.abbr + ' ' + num(p.scoreHome, pre.score.home));
+    return 'SITUATION SET \u2014 ' + (bits.join('; ') || 'no change') + (p.note ? '. ' + p.note : '.');
   }
   case 'to': return 'Timeout, ' + g.teams[p.team].abbr + '.';
   case 'clock': return 'Clock set ' + plus(num(p.delta, 0)) + 's.';
@@ -1609,6 +1721,17 @@ function bump(key, by){
   if(v){ v.value = String(pad[key]); v.classList.toggle('neg', pad[key] < 0); }
   refreshPreview();
 }
+/* One outcome from several. Toggles that had to be switched OFF to reveal
+   what you actually wanted were how the return got lost. */
+function mkChoice(host, label, opts, isOn, pick){
+  var grp = mkGrp(label);
+  opts.forEach(function(o){
+    grp.r.appendChild(mkBtn(o[1], isOn(o[0]), function(){
+      pick(o[0]); renderPadCtx();
+    }, 'wide' + (o[2] ? ' ' + o[2] : '')));
+  });
+  host.appendChild(grp.d);
+}
 function mkToggle(host, defs){
   var grp = mkGrp(null);
   defs.forEach(function(d){
@@ -1662,9 +1785,9 @@ function setType(t){
   case 'pass':  pad.passer = firstAt(off, ['QB']); pad.complete = true; pad.yards = 0; break;
   case 'sack':  pad.passer = firstAt(off, ['QB']); pad.yards = -7; break;
   case 'punt':  pad.punter = firstAt(off, ['P','K']); pad.gross = 42;
-                pad.returner = firstAt(def, POS.ret); pad.fairCatch = true; break;
+                pad.returner = firstAt(def, POS.ret); pad.retYards = 0; break;
   case 'fg':    pad.kicker = firstAt(off, ['K']); pad.dist = (100 - st.yard) + 17; pad.good = true; break;
-  case 'ko':    pad.kicker = firstAt(st.kickTeam, ['K']); pad.touchback = true;
+  case 'ko':    pad.kicker = firstAt(st.kickTeam, ['K']); pad.touchback = false;
                 pad.catchAt = 5; pad.toYard = 25;
                 pad.returner = firstAt(other(st.kickTeam), POS.ret); break;
   case 'xp':    pad.kicker = firstAt(st.patTeam, ['K']); pad.good = true; break;
@@ -1673,6 +1796,21 @@ function setType(t){
   case 'kneel': pad.rusher = firstAt(off, ['QB']); pad.yards = -1; break;
   case 'spike': pad.passer = firstAt(off, ['QB']); break;
   case 'to':    pad.team = off || 'away'; break;
+  case 'set': {
+    var holder = off || (st.phase === 'pat' ? st.patTeam : st.kickTeam) || 'away';
+    pad.poss = holder;
+    pad.kickoff = false;
+    pad.half = (st.yard != null && st.yard > 50) ? 'opp' : 'own';
+    pad.spotN = st.yard != null ? (st.yard > 50 ? 100 - st.yard : st.yard) : 25;
+    pad.down = st.down || 1;
+    pad.toGo = st.toGo || 10;
+    pad.qtr = st.qtr;
+    pad.clockM = Math.floor(st.clock / 60);
+    pad.clockS = st.clock % 60;
+    pad.scoreAway = st.score.away;
+    pad.scoreHome = st.score.home;
+    break;
+  }
   }
   renderPadCtx();
 }
@@ -1703,7 +1841,7 @@ function renderPad(g, st){
   var row = $('rowType');
   row.textContent = '';
   if(!pad || types.length && !types.some(function(x){ return x[0] === pad.t; }) &&
-     ['pen','kneel','spike','to','note'].indexOf(pad.t) < 0){
+     ['pen','kneel','spike','to','note','set'].indexOf(pad.t) < 0){
     setTypeSilent(types.length ? types[0][0] : 'note');
   }
   types.forEach(function(t){
@@ -1713,6 +1851,7 @@ function renderPad(g, st){
   if(st.phase === 'scrimmage'){ extra.push(['kneel','Kneel']); extra.push(['spike','Spike']); }
   extra.push(['to','Timeout']);
   extra.push(['note','Note']);
+  extra.push(['set','Set up']);
   extra.forEach(function(t){
     row.appendChild(mkBtn(t[1], pad.t === t[0], function(){ setType(t[0]); }, 'sm'));
   });
@@ -1741,10 +1880,14 @@ function renderPadCtx(){
   case 'ko': {
     var kick = st.kickTeam, recv = other(kick);
     mkPlayers(host, 'Kicker', kick, 'kicker', ['K','P']);
-    mkToggle(host, [
-      ['touchback','Touchback', 'wide', function(){ pad.onside = false; }],
-      ['onside','Onside', 'wide', function(){ pad.touchback = false; }]
-    ]);
+    mkChoice(host, 'What happened', [
+      ['ret','Returned'], ['tb','Touchback'], ['onside','Onside']
+    ], function(v){
+      return v === (pad.onside ? 'onside' : (pad.touchback ? 'tb' : 'ret'));
+    }, function(v){
+      pad.onside = v === 'onside';
+      pad.touchback = v === 'tb';
+    });
     if(pad.onside){
       var og = mkGrp('Recovered by');
       og.r.appendChild(mkBtn(g.teams[kick].abbr + ' (kicking)', pad.onsideRec === 'k', function(){
@@ -1771,12 +1914,18 @@ function renderPadCtx(){
   case 'punt': {
     mkPlayers(host, 'Punter', off, 'punter', ['P','K']);
     mkYards(host, 'Punt distance', 'gross', 42);
-    mkToggle(host, [
-      ['touchback','Touchback','wide'],
-      ['fairCatch','Fair catch','wide'],
-      ['downed','Downed','wide'],
-      ['blocked','Blocked','danger']
-    ]);
+    mkChoice(host, 'What happened', [
+      ['ret','Returned'], ['fair','Fair catch'], ['downed','Downed'],
+      ['tb','Touchback'], ['blocked','Blocked','danger']
+    ], function(v){
+      return v === (pad.blocked ? 'blocked' : pad.touchback ? 'tb' :
+                    pad.fairCatch ? 'fair' : pad.downed ? 'downed' : 'ret');
+    }, function(v){
+      pad.blocked = v === 'blocked';
+      pad.touchback = v === 'tb';
+      pad.fairCatch = v === 'fair';
+      pad.downed = v === 'downed';
+    });
     if(pad.blocked){
       var bg = mkGrp('Recovered by');
       bg.r.appendChild(mkBtn(g.teams[off].abbr + ' (kicking)', pad.blockRec !== 'd', function(){
@@ -1868,7 +2017,7 @@ function renderPadCtx(){
       pad.result = 'int';
       mkPlayers(host, 'Intercepted by', def, 'defender', POS.def);
       mkYards(host, 'Picked off, yards past the line', 'yards', 8);
-      mkYards(host, 'Return yards', 'retYards', 0);
+      mkYards(host, 'Interception return, yards', 'retYards', 0);
     }else{
       mkPlayers(host, 'Receiver', off, 'receiver', POS.cat);
       if(pad.complete){
@@ -1949,6 +2098,50 @@ function renderPadCtx(){
     break;
   }
 
+  case 'set': {
+    host.appendChild(el('div', 'note',
+      'Put the board wherever you like \u2014 to start a game at half time, or to straighten ' +
+      'things out after something the sheet has no play for. It is recorded as a line in the ' +
+      'play-by-play, so Undo takes it back like anything else.'));
+    mkChoice(host, 'Ball with', [
+      ['away', g.teams.away.abbr], ['home', g.teams.home.abbr]
+    ], function(v){ return pad.poss === v; }, function(v){ pad.poss = v; });
+    mkChoice(host, 'Play resumes with', [
+      ['scrim','A down'], ['kick','A kickoff']
+    ], function(v){ return v === (pad.kickoff ? 'kick' : 'scrim'); },
+       function(v){ pad.kickoff = v === 'kick'; });
+
+    if(!pad.kickoff){
+      mkChoice(host, 'Which half of the field', [
+        ['own', 'Their own half'], ['opp', g.teams[other(pad.poss)].abbr + '\u2019s half']
+      ], function(v){ return pad.half === v; }, function(v){ pad.half = v; });
+      mkYards(host, 'On the ' + (pad.half === 'opp' ? g.teams[other(pad.poss)].abbr : 'own') +
+        ' yard line', 'spotN', 25);
+      mkChoice(host, 'Down', [['1','1st'],['2','2nd'],['3','3rd'],['4','4th']],
+        function(v){ return String(pad.down) === v; }, function(v){ pad.down = num(v, 1); });
+      mkYards(host, 'Yards to go', 'toGo', 10);
+    }
+
+    mkChoice(host, 'Quarter', [['1','1st'],['2','2nd'],['3','3rd'],['4','4th'],['5','OT']],
+      function(v){ return String(pad.qtr) === v; }, function(v){ pad.qtr = num(v, 1); });
+    if(g.rules.clockMode === 'time'){
+      mkYards(host, 'Clock \u2014 minutes', 'clockM', 15);
+      mkYards(host, 'Clock \u2014 seconds', 'clockS', 0);
+    }
+    mkYards(host, 'Score \u2014 ' + g.teams.away.name, 'scoreAway', 0);
+    mkYards(host, 'Score \u2014 ' + g.teams.home.name, 'scoreHome', 0);
+
+    var stn = mkGrp('Why (optional)');
+    var sti = el('input', 'mini');
+    sti.inputMode = 'text';
+    sti.placeholder = 'starting at half time, fixing a misread…';
+    sti.value = pad.note || '';
+    sti.addEventListener('input', function(){ pad.note = sti.value; });
+    stn.r.appendChild(sti);
+    host.appendChild(stn.d);
+    break;
+  }
+
   case 'note': {
     var ng2 = mkGrp('Note for the sheet');
     var ta = el('input', 'mini');
@@ -1963,7 +2156,7 @@ function renderPadCtx(){
   }
 
   /* seconds override, for anyone keeping the clock by hand */
-  if(['to','note','endq','final'].indexOf(pad.t) < 0 && G().rules.clockMode === 'time'){
+  if(['to','note','endq','final','set'].indexOf(pad.t) < 0 && G().rules.clockMode === 'time'){
     var sg = mkGrp('Clock');
     var si = el('input', 'mini');
     si.inputMode = 'numeric';
@@ -2106,6 +2299,26 @@ function renderBox(){
   var g = G(), d = D, b = $('boxBody');
   b.textContent = '';
 
+  /* the masthead the printed sheet opens with */
+  var ph = el('div', 'printhead');
+  var lead = d.st.score.away === d.st.score.home ? null
+           : (d.st.score.away > d.st.score.home ? 'away' : 'home');
+  var side = function(t){ return g.teams[t].name + ' ' + d.st.score[t]; };
+  ph.appendChild(el('div', 'match', lead
+    ? side(lead) + ', ' + side(other(lead))
+    : side('away') + ', ' + side('home')));
+  var sub = [];
+  sub.push(d.st.phase === 'final' ? 'Final'
+    : (d.st.qtr >= 5 ? 'Overtime' : ord(d.st.qtr) + ' quarter') +
+      (g.rules.clockMode === 'time' ? ', ' + mmss(d.st.clock) + ' left' : ''));
+  if(g.date) sub.push(g.date);
+  if(g.label) sub.push(g.label);
+  if(g.venue) sub.push(g.venue);
+  sub.push(g.teams.away.name + ' at ' + g.teams.home.name);
+  ph.appendChild(el('div', 'sub', sub.join('   \u00b7   ')));
+  ph.appendChild(el('div', 'rule'));
+  b.appendChild(ph);
+
   /* line score */
   var qs = d.st.line.away.length;
   var head = ['']; for(var i = 0; i < qs; i++) head.push(i >= 4 ? 'OT' + (i - 3) : String(i + 1));
@@ -2190,6 +2403,38 @@ function renderBox(){
     if(!P.length && !R.length && !C.length && !K.length && !DF.length)
       b.appendChild(el('div', 'note', 'Nothing recorded yet.'));
   });
+
+  /* the full record, on the printed sheet only — it is already on screen
+     in the panel behind this one */
+  if(d.rows.length){
+    var pbpHead = el('h3', 'sec printonly', 'Play by play');
+    b.appendChild(pbpHead);
+    var pbp = el('div', 'pbp printonly');
+    var seen = 0;
+    d.rows.forEach(function(r){
+      if(r.pre.qtr !== seen){
+        seen = r.pre.qtr;
+        var q = el('div', 'r');
+        var qs = el('div', 's', '');
+        var qt = el('div', 't', (seen >= 5 ? 'Overtime' : ord(seen) + ' quarter') +
+          ' \u2014 ' + g.teams.away.abbr + ' ' + r.pre.score.away +
+          ', ' + g.teams.home.abbr + ' ' + r.pre.score.home);
+        qt.style.fontWeight = '700';
+        q.appendChild(qs); q.appendChild(qt);
+        pbp.appendChild(q);
+      }
+      var row = el('div', 'r');
+      row.appendChild(el('div', 's', situation(r.pre, g)));
+      row.appendChild(el('div', 't', describe(r)));
+      pbp.appendChild(row);
+    });
+    b.appendChild(pbp);
+  }
+
+  var foot = el('div', 'printfoot printonly');
+  foot.textContent = 'Kept with the APBA Football Scorekeeper.';
+  b.appendChild(foot);
+
   $('ovBox').hidden = false;
 }
 
@@ -2973,8 +3218,12 @@ function renderMenu(){
 function loadSample(){
   var g = G();
   var A = g.teams.away, H = g.teams.home;
+  /* real rosters say ILB and OLB where the starting skeleton says LB, so
+     every spelling gets a look before falling back to anybody at all */
   var pick = function(t, pos, n){
-    var r = roster(t).filter(function(p){ return p.pos === pos; });
+    var want = [].concat(pos);
+    var r = roster(t).filter(function(p){ return want.indexOf(p.pos) >= 0; });
+    if(!r.length) r = roster(t);
     return r.length ? r[Math.min(n || 0, r.length - 1)].id : null;
   };
   var P = {
@@ -2983,7 +3232,9 @@ function loadSample(){
     hK: pick('home','K'), hP: pick('home','P'),
     aQB: pick('away','QB'), aRB: pick('away','RB'), aWR: pick('away','WR'),
     aK: pick('away','K'), aP: pick('away','P'),
-    aCB: pick('away','CB'), aLB: pick('away','LB'), hLB: pick('home','LB'), hDE: pick('home','DE')
+    aCB: pick('away', ['CB','DB']), aLB: pick('away', ['LB','ILB','OLB','MLB']),
+    hLB: pick('home', ['LB','ILB','OLB','MLB']),
+    hDE: pick('home', ['DE','DT','NT','EDGE','DL'])
   };
   var p = [];
   function add(o){ o.id = uid('pl'); p.push(o); }
@@ -3082,6 +3333,10 @@ function wire(){
    ['clubsClose','ovClubs'],
    ['seasonClose','ovSeason'],['editClose','ovEdit']].forEach(function(p){
     $(p[0]).addEventListener('click', function(){ $(p[1]).hidden = true; render(); });
+  });
+  $('boxPrint').addEventListener('click', function(){
+    if(!window.print){ toast('This browser will not print.', 'bad'); return; }
+    window.print();
   });
   $('boxText').addEventListener('click', function(){ copyOut(boxText()); });
   $('boxJSON').addEventListener('click', function(){
